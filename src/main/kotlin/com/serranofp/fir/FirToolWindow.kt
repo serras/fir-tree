@@ -46,7 +46,7 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
     private val choices = ComboBox(
         FirResolvePhase.entries.toTypedArray()
     )
-    private val fq = CheckBox("Show FQ names", selected = false)
+    private val fq = CheckBox("Fully qualified names", selected = false)
 
     private var inProgressAction: CancellablePromise<*>? = null
     private var currentTriple: Triple<Project, VirtualFile, TextEditor>? = null
@@ -58,9 +58,9 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
         // set up UI
         val ui = panel {
             row {
-                label("Resolve up to phase:").customize(UnscaledGaps(left = 5))
+                label("Resolve up to phase:").customize(UnscaledGaps(left = 10))
                 cell(choices).align(Align.FILL).customize(UnscaledGaps(left = 5, right = 5)).resizableColumn()
-                cell(fq).customize(UnscaledGaps(left = 5, right = 5))
+                cell(fq).customize(UnscaledGaps(left = 5, right = 10))
             }
             row {
                 val scrollPane = JBScrollPane(tree).also {
@@ -87,7 +87,8 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
         tree.addTreeSelectionListener { event ->
             // move to and select the node in the code
             val model = tree.model as? FirTreeModel
-            val source = (event.path.lastPathComponent as? FirElement)?.takeIf { it !is FirLazyBlock }?.source
+            val source =
+                (event.path.lastPathComponent as? Pair<String?, FirElement>)?.second?.takeIf { it !is FirLazyBlock }?.source
             if (model == null || source == null) return@addTreeSelectionListener
             model.editor.editor.caretModel.moveToOffset(source.startOffset)
             model.editor.editor.selectionModel.setSelection(source.startOffset, source.endOffset)

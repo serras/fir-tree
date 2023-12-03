@@ -12,10 +12,12 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirFunction
+import org.jetbrains.kotlin.fir.declarations.FirReceiverParameter
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.FirResolvedDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
+import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirBlock
@@ -42,6 +44,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
+import org.jetbrains.kotlin.fir.types.FirTypeProjection
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.types.coneTypeOrNull
 import org.jetbrains.kotlin.fir.types.isResolved
@@ -59,6 +62,8 @@ import javax.swing.event.TreeModelListener
 import javax.swing.tree.TreeCellRenderer
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
+import kotlin.reflect.KProperty1
+import kotlin.reflect.full.memberProperties
 
 class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor): TreeModel {
     override fun getRoot(): Any = declarations
@@ -66,6 +71,7 @@ class FirTreeModel(private val declarations: List<FirElement>, internal val edit
     private fun Any?.toChildren(): List<*> = when (this) {
         is List<*> -> this
         is FirElement -> children()
+        is Pair<*, *> -> second.toChildren()
         else -> emptyList<Any>()
     }
 
@@ -81,12 +87,20 @@ class FirTreeModel(private val declarations: List<FirElement>, internal val edit
 
 class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer {
     override fun getTreeCellRendererComponent(
-        tree: JTree?, value: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean,
+        tree: JTree?, incoming: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean,
     ): Component {
+        val (prefix, value) = when (incoming) {
+            is Pair<*, *> -> (incoming.first?.let { "$it: " } ?: "") to incoming.second
+            else -> "" to incoming
+        }
         val name = when (value) {
             null -> "?"
             is String -> value
             is List<*> -> "declarations"
+            is Pair<*, *> -> {
+                val second = value.second!!::class.simpleName?.withoutImpl() ?: "?"
+                value.first?.let { "$it: $second" } ?: second
+            }
             else -> value::class.simpleName?.withoutImpl() ?: "?"
         }
         val addition = when (value) {
@@ -117,7 +131,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
             is FirNamedReference -> " (name = ${value.name.asString()})"
             else -> ""
         }
-        val label = "$name$addition"
+        val label = "$prefix$name$addition"
         return when (val icon = (value as? FirElement)?.icon) {
             null -> JLabel(label)
             else -> JLabel(label, icon, SwingConstants.LEFT)
@@ -148,17 +162,20 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
         }
     }
 
-fun FirElement.children(): List<FirElement> = when (this) {
+fun FirElement.children(): List<Pair<String?, FirElement>> = when (this) {
     is FirPureAbstractElement -> children()
     else -> emptyList()
 }
 
-fun FirPureAbstractElement.children(): List<FirElement> =
+fun FirPureAbstractElement.children(): List<Pair<String?, FirElement>> =
     ReadAction.compute<_, Throwable> {
+        val properties: List<KProperty1<FirPureAbstractElement, *>> = this::class.memberProperties.toList() as List<KProperty1<FirPureAbstractElement, *>>
+        val propertiesWithValues = properties.map { it to it.get(this) }
         buildList {
             this@children.acceptChildren(object : FirVisitorVoid() {
                 override fun visitElement(element: FirElement) {
-                    add(element)
+                    val propertyName = propertiesWithValues.firstOrNull { it.second == element }?.first?.name
+                    add(propertyName to element)
                 }
 
                 override fun visitDeclarationStatus(declarationStatus: FirDeclarationStatus) {
@@ -184,7 +201,7 @@ val FirElement.icon: Icon?
         is FirFunction -> KotlinIcons.FUNCTION
         is FirRegularClass -> KotlinIcons.CLASS
         is FirAnonymousObject -> KotlinIcons.OBJECT
-        is FirTypeParameter -> KotlinIcons.PARAMETER
+        is FirTypeParameter, is FirReceiverParameter, is FirValueParameter -> KotlinIcons.PARAMETER
         is FirTypeAlias -> KotlinIcons.TYPE_ALIAS
         is FirVariable -> KotlinIcons.VAL
         is FirTypeRef -> AllIcons.Actions.InlayRenameInComments
@@ -199,6 +216,7 @@ val FirElement.icon: Icon?
         is FirWhenBranch -> AllIcons.Vcs.CommitNode
         is FirExpression -> AllIcons.Debugger.Value
         is FirStatement -> AllIcons.Debugger.Db_muted_disabled_method_breakpoint
+        is FirTypeProjection -> AllIcons.Nodes.Type
         is FirContractDescription -> AllIcons.Nodes.Template
         is FirArgumentList -> AllIcons.Debugger.VariablesTab
         else -> null
