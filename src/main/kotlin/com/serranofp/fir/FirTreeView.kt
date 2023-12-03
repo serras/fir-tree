@@ -105,7 +105,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
         }
         val addition = when (value) {
             is FirDeclaration -> {
-                val shownName = value.symbol.shownName(useFqNames)?.let { " (name = $it)" } ?: ""
+                val shownName = value.symbol.shownName(useFqNames)?.let { " (name: $it)" } ?: ""
                 val origin = when (value.origin) {
                     is FirDeclarationOrigin.Synthetic -> " <synthetic>"
                     FirDeclarationOrigin.IntersectionOverride -> " <intersection override>"
@@ -114,21 +114,21 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
                 }
                 "$shownName$origin"
             }
-            is FirConstExpression<*> -> " (value = ${value.value})"
+            is FirConstExpression<*> -> " (value: ${value.value})"
             is FirExpression -> when (value !is FirLazyBlock && value !is FirLazyExpression && value.isResolved) {
                 false -> ""
-                true -> " (type = ${value.resolvedType.shownName(useFqNames)})"
+                true -> " (type: ${value.resolvedType.shownName(useFqNames)})"
             }
             is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
             is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
                 null -> ""
-                else -> " (type = ${coneType.shownName(useFqNames)})"
+                else -> " (type: ${coneType.shownName(useFqNames)})"
             }
             is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
-                null -> " (name = ${value.name.asString()})"
-                else -> " (resolvedSymbol = $symbolName)"
+                null -> " (name: ${value.name.asString()})"
+                else -> " (resolvedSymbol: $symbolName)"
             }
-            is FirNamedReference -> " (name = ${value.name.asString()})"
+            is FirNamedReference -> " (name: ${value.name.asString()})"
             else -> ""
         }
         val label = "$prefix$name$addition"
@@ -174,7 +174,13 @@ fun FirPureAbstractElement.children(): List<Pair<String?, FirElement>> =
         buildList {
             this@children.acceptChildren(object : FirVisitorVoid() {
                 override fun visitElement(element: FirElement) {
-                    val propertyName = propertiesWithValues.firstOrNull { it.second == element }?.first?.name
+                    var propertyName = propertiesWithValues.firstOrNull { it.second == element }?.first?.name
+                    if (propertyName == null) {
+                        propertyName = propertiesWithValues.firstOrNull {
+                            val collection = it.second as? Collection<*>
+                            collection != null && element in collection
+                        }?.first?.name?.let { "$it[]" }
+                    }
                     add(propertyName to element)
                 }
 
