@@ -1,0 +1,54 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.serranofp.fir</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>FIR Tree</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="trupill@gmail.com" url="https://serranofp.com">Alejandro Serrano Mena</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description>Show the FIR (Frontend Intermediate Representation) tree from a Kotlin file</description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.kotlin</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow factoryClass="com.serranofp.fir.FirToolWindow" id="FIR Tree" icon="/icons/fir.svg" />
+        <projectService
+                serviceInterface="org.jetbrains.kotlin.analysis.low.level.api.fir.api.services.FirSealedClassInheritorsProcessorFactory"
+                serviceImplementation="org.jetbrains.kotlin.idea.fir.low.level.api.ide.FirSealedClassInheritorsProcessorFactoryIdeImpl"/>
+
+        <projectService serviceInterface="org.jetbrains.kotlin.analysis.low.level.api.fir.project.structure.LLFirLibrarySymbolProviderFactory"
+                        serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.stubBased.deserialization.LLStubBasedLibrarySymbolProviderFactory"/>
+        <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.project.structure.LLFirBuiltinsSessionFactory"/>
+        <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionCache"/>
+        <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionInvalidationService"/>
+        <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirGlobalResolveComponents"/>
+        <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionService"/>
+    </extensions>
+
+    <extensionPoints>
+        <extensionPoint
+                qualifiedName="org.jetbrains.kotlin.llFirSessionConfigurator"
+                interface="org.jetbrains.kotlin.analysis.low.level.api.fir.sessions.LLFirSessionConfigurator"
+                area="IDEA_PROJECT"
+                dynamic="true"/>
+
+        <extensionPoint
+                qualifiedName="org.jetbrains.kotlin.ktResolveExtensionProvider"
+                interface="org.jetbrains.kotlin.analysis.api.resolve.extensions.KtResolveExtensionProvider"
+                area="IDEA_PROJECT"
+                dynamic="true"/>
+
+    </extensionPoints>
+</idea-plugin>
