@@ -77,7 +77,7 @@ import kotlin.reflect.full.memberProperties
 data class FirTreeElement(
     val propertyName: String?,
     val propertyKind: PropertyKind,
-    val value: FirElement
+    val value: FirElement,
 ) {
     enum class PropertyKind {
         SINGLE, ARRAY
@@ -85,7 +85,7 @@ data class FirTreeElement(
 }
 
 @Suppress("EmptyFunctionBlock")
-class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor): TreeModel {
+class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor) : TreeModel {
     override fun getRoot(): Any = declarations
 
     private fun Any?.toChildren(): List<*> = when (this) {
@@ -100,14 +100,20 @@ class FirTreeModel(private val declarations: List<FirElement>, internal val edit
     override fun isLeaf(node: Any?): Boolean = node.toChildren().isEmpty()
     override fun getIndexOfChild(parent: Any?, child: Any?): Int = parent.toChildren().indexOf(child)
 
-    override fun valueForPathChanged(path: TreePath?, newValue: Any?) { }
-    override fun addTreeModelListener(l: TreeModelListener?) { }
-    override fun removeTreeModelListener(l: TreeModelListener?) { }
+    override fun valueForPathChanged(path: TreePath?, newValue: Any?) {}
+    override fun addTreeModelListener(l: TreeModelListener?) {}
+    override fun removeTreeModelListener(l: TreeModelListener?) {}
 }
 
-class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer {
+class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer {
     override fun getTreeCellRendererComponent(
-        tree: JTree?, incoming: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean,
+        tree: JTree?,
+        incoming: Any?,
+        selected: Boolean,
+        expanded: Boolean,
+        leaf: Boolean,
+        row: Int,
+        hasFocus: Boolean,
     ): Component {
         val (prefix, value) = splitTreeCell(incoming)
         val name = when (value) {
@@ -133,14 +139,18 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
         is FirTreeElement -> when {
             incoming.propertyName == null -> ""
             incoming.propertyKind == FirTreeElement.PropertyKind.SINGLE ->
-            "${incoming.propertyName}: "
+                "${incoming.propertyName}: "
+
             incoming.propertyKind == FirTreeElement.PropertyKind.ARRAY ->
-            "${incoming.propertyName} ∋ "
+                "${incoming.propertyName} ∋ "
+
             else -> ""
         } to incoming.value
+
         else -> "" to incoming
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun getTreeCellAddition(value: Any?): String = when (value) {
         is FirDeclaration -> {
             val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
@@ -157,12 +167,14 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
                     value.isVar -> "var"
                     else -> null
                 }
+
                 else -> null
             }
             listOfNotNull(shownName, origin, additionalInfo)
                 .takeIf { it.isNotEmpty() }
                 ?.let { " (${it.joinToString()})" } ?: ""
         }
+
         is FirStatement -> {
             val additionalInfo = when (value) {
                 is FirConstExpression<*> -> "value: ${value.value}"
@@ -180,15 +192,18 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
                 .takeIf { it.isNotEmpty() }
                 ?.let { " (${it.joinToString()})" } ?: ""
         }
+
         is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
         is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
             null -> ""
             else -> " (type: ${coneType.shownName(useFqNames)})"
         }
+
         is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
             null -> " (name: ${value.name.asString()})"
             else -> " (resolvedSymbol: $symbolName)"
         }
+
         is FirNamedReference -> " (name: ${value.name.asString()})"
         else -> ""
     }

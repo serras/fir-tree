@@ -39,7 +39,7 @@ import javax.swing.event.TreeModelListener
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
 
-class FirToolWindow: ToolWindowFactory, DumbAware {
+class FirToolWindow : ToolWindowFactory, DumbAware {
     private val tree = Tree(EmptyTreeModel).also {
         it.cellRenderer = FirCellRenderer(false)
         it.isRootVisible = false
@@ -99,26 +99,30 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
 
         // start listening for selected file editors
         project.messageBus.connect()
-            .subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object: FileEditorManagerListener {
-                override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-                    // refresh(project, file)
-                }
-                override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-                    // refresh(project, file)
-                }
-                override fun selectionChanged(event: FileEditorManagerEvent) {
-                    inProgressAction?.cancel()
-                    val newTextEditor = event.newEditor as? TextEditor
-                    if (event.newFile == null || newTextEditor == null) {
-                        status = null
-                        tree.model = EmptyTreeModel
-                    } else {
-                        status = event.newFile!! to newTextEditor
-                        refresh(project, event.newFile!!, newTextEditor)
+            .subscribe(
+                FileEditorManagerListener.FILE_EDITOR_MANAGER,
+                object : FileEditorManagerListener {
+                    override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+                        // refresh(project, file)
+                    }
+
+                    override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+                        // refresh(project, file)
+                    }
+
+                    override fun selectionChanged(event: FileEditorManagerEvent) {
+                        inProgressAction?.cancel()
+                        val newTextEditor = event.newEditor as? TextEditor
+                        if (event.newFile == null || newTextEditor == null) {
+                            status = null
+                            tree.model = EmptyTreeModel
+                        } else {
+                            status = event.newFile!! to newTextEditor
+                            refresh(project, event.newFile!!, newTextEditor)
+                        }
                     }
                 }
-            })
-
+            )
     }
 
     private fun refresh(project: Project, file: VirtualFile, editor: TextEditor) {
@@ -144,22 +148,23 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
                 project.getService(LLFirResolveSessionService::class.java)
                     .getFirResolveSessionNoCaching(module)
             return ktFile.declarations.map { session.resolveToFirSymbol(it, currentResolveChoice).fir }
-        } catch(_: Exception) {
+        } catch (_: Exception) {
             return null
         }
     }
 }
 
 @Suppress("EmptyFunctionBlock")
-object EmptyTreeModel: TreeModel {
+object EmptyTreeModel : TreeModel {
     override fun getRoot(): Any = "<root>"
     override fun getChild(parent: Any?, index: Int): Any =
         throw IllegalArgumentException("no children")
+
     override fun getChildCount(parent: Any?): Int = 0
     override fun getIndexOfChild(parent: Any?, child: Any?): Int = -1
     override fun isLeaf(node: Any?): Boolean = true
 
-    override fun valueForPathChanged(path: TreePath?, newValue: Any?) { }
-    override fun addTreeModelListener(l: TreeModelListener?) { }
-    override fun removeTreeModelListener(l: TreeModelListener?) { }
+    override fun valueForPathChanged(path: TreePath?, newValue: Any?) {}
+    override fun addTreeModelListener(l: TreeModelListener?) {}
+    override fun removeTreeModelListener(l: TreeModelListener?) {}
 }
