@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.FirPureAbstractElement
 import org.jetbrains.kotlin.fir.contracts.FirContractDescription
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousObject
+import org.jetbrains.kotlin.fir.declarations.FirConstructor
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
@@ -21,7 +22,9 @@ import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.declarations.FirVariable
+import org.jetbrains.kotlin.fir.expressions.ExhaustivenessStatus
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
+import org.jetbrains.kotlin.fir.expressions.FirAssignmentOperatorStatement
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirConstExpression
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
@@ -32,6 +35,8 @@ import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
 import org.jetbrains.kotlin.fir.expressions.FirLoop
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
+import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
+import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
 import org.jetbrains.kotlin.fir.expressions.FirWhenExpression
@@ -122,19 +127,38 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
         }
         val addition = when (value) {
             is FirDeclaration -> {
-                val shownName = value.symbol.shownName(useFqNames)?.let { " (name: $it)" } ?: ""
+                val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
                 val origin = when (value.origin) {
-                    is FirDeclarationOrigin.Synthetic -> " <synthetic>"
-                    FirDeclarationOrigin.IntersectionOverride -> " <intersection override>"
-                    is FirDeclarationOrigin.SubstitutionOverride -> " <substitution override>"
-                    else -> ""
+                    is FirDeclarationOrigin.Synthetic -> "<synthetic>"
+                    FirDeclarationOrigin.IntersectionOverride -> "<intersection override>"
+                    is FirDeclarationOrigin.SubstitutionOverride -> "<substitution override>"
+                    else -> null
                 }
-                "$shownName$origin"
+                val additionalInfo = when (value) {
+                    is FirConstructor -> "isPrimary: ${value.isPrimary}"
+                    is FirVariable -> when {
+                        value.isVal -> "val"
+                        value.isVar -> "var"
+                        else -> null
+                    }
+                    else -> null
+                }
+                listOfNotNull(shownName, origin, additionalInfo).takeIf { it.isNotEmpty() }?.let { " (${it.joinToString()})" } ?: ""
             }
-            is FirConstExpression<*> -> " (value: ${value.value})"
-            is FirExpression -> when (value !is FirLazyBlock && value !is FirLazyExpression && value.isResolved) {
-                false -> ""
-                true -> " (type: ${value.resolvedType.shownName(useFqNames)})"
+            is FirStatement -> {
+                val additionalInfo = when (value) {
+                    is FirConstExpression<*> -> "value: ${value.value}"
+                    is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
+                    is FirAssignmentOperatorStatement -> "operator: ${value.operation.name}"
+                    is FirTypeOperatorCall -> "operator: ${value.operation.name}"
+                    is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
+                    else -> null
+                }
+                val typeInfo = when (value is FirExpression && value !is FirLazyBlock && value !is FirLazyExpression && value.isResolved) {
+                    false -> null
+                    true -> "type: ${value.resolvedType.shownName(useFqNames)}"
+                }
+                listOfNotNull(additionalInfo, typeInfo).takeIf { it.isNotEmpty() }?.let { " (${it.joinToString()})" } ?: ""
             }
             is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
             is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
@@ -153,7 +177,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
             null -> Label(label)
             else -> JLabel(label, icon, SwingConstants.LEFT)
         }
-        if (value is FirElement && value.source == null) {
+        if (value is FirElement && value !is FirLazyBlock && value !is FirLazyExpression && value.source == null) {
             labelComponent.font = labelComponent.font.deriveFont(Font.ITALIC)
             labelComponent.foreground = JBColor.DARK_GRAY
         }
@@ -184,7 +208,16 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
         }
     }
 
+fun ExhaustivenessStatus?.shown(): String = when (this) {
+    null -> "unknown"
+    ExhaustivenessStatus.ExhaustiveAsNothing -> "ExhaustiveAsNothing"
+    ExhaustivenessStatus.ProperlyExhaustive -> "ProperlyExhaustive"
+    is ExhaustivenessStatus.NotExhaustive -> "NotExhaustive"
+}
+
 fun FirElement.children(): List<FirTreeElement> = when (this) {
+    is FirLazyBlock -> emptyList()
+    is FirLazyExpression -> emptyList()
     is FirPureAbstractElement -> children()
     else -> emptyList()
 }
@@ -236,6 +269,7 @@ val FirElement.icon: Icon?
         is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.ErrorIntroduction
         is FirAnonymousFunction -> AllIcons.Nodes.Lambda
         is FirLambdaArgumentExpression -> AllIcons.Debugger.LambdaBreakpoint
+        is FirConstructor -> KotlinIcons.CLASS_INITIALIZER
         is FirFunction -> KotlinIcons.FUNCTION
         is FirRegularClass -> KotlinIcons.CLASS
         is FirAnonymousObject -> KotlinIcons.OBJECT
