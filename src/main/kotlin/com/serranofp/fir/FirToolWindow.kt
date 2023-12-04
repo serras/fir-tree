@@ -2,6 +2,7 @@ package com.serranofp.fir
 
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -49,7 +50,7 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
     private val fq = CheckBox("Fully qualified names", selected = false)
 
     private var inProgressAction: CancellablePromise<*>? = null
-    private var currentTriple: Triple<Project, VirtualFile, TextEditor>? = null
+    private var status: Pair<VirtualFile, TextEditor>? = null
 
     private val currentResolveChoice: FirResolvePhase
         get() = choices.selectedItem as FirResolvePhase
@@ -74,8 +75,8 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
 
         choices.addActionListener {
             inProgressAction?.cancel()
-            if (currentTriple != null) {
-                val (project, file, editor) = currentTriple!!
+            if (status != null) {
+                val (file, editor) = status!!
                 refresh(project, file, editor)
             }
         }
@@ -87,10 +88,12 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
         tree.addTreeSelectionListener { event ->
             // move to and select the node in the code
             val model = tree.model as? FirTreeModel
-            val source =
-                (event.path.lastPathComponent as? Pair<String?, FirElement>)?.second?.takeIf { it !is FirLazyBlock }?.source
+            val lastComponent = event.path.lastPathComponent
+            val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement)
+            val source = selected?.takeIf { it !is FirLazyBlock }?.source
             if (model == null || source == null) return@addTreeSelectionListener
             model.editor.editor.caretModel.moveToOffset(source.startOffset)
+            model.editor.editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
             model.editor.editor.selectionModel.setSelection(source.startOffset, source.endOffset)
         }
 
@@ -107,10 +110,10 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
                     inProgressAction?.cancel()
                     val newTextEditor = event.newEditor as? TextEditor
                     if (event.newFile == null || newTextEditor == null) {
-                        currentTriple = null
+                        status = null
                         tree.model = EmptyTreeModel
                     } else {
-                        currentTriple = Triple(project, event.newFile!!, newTextEditor)
+                        status = event.newFile!! to newTextEditor
                         refresh(project, event.newFile!!, newTextEditor)
                     }
                 }

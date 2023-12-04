@@ -3,6 +3,8 @@ package com.serranofp.fir
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.ui.JBColor
+import com.intellij.ui.components.Label
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirPureAbstractElement
 import org.jetbrains.kotlin.fir.contracts.FirContractDescription
@@ -54,6 +56,7 @@ import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.idea.KotlinIcons
 import java.awt.Component
+import java.awt.Font
 import javax.swing.Icon
 import javax.swing.JLabel
 import javax.swing.JTree
@@ -63,7 +66,18 @@ import javax.swing.tree.TreeCellRenderer
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
 import kotlin.reflect.KProperty1
+import kotlin.reflect.KVisibility
 import kotlin.reflect.full.memberProperties
+
+data class FirTreeElement(
+    val propertyName: String?,
+    val propertyKind: PropertyKind,
+    val value: FirElement
+) {
+    enum class PropertyKind {
+        SINGLE, ARRAY
+    }
+}
 
 class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor): TreeModel {
     override fun getRoot(): Any = declarations
@@ -71,7 +85,7 @@ class FirTreeModel(private val declarations: List<FirElement>, internal val edit
     private fun Any?.toChildren(): List<*> = when (this) {
         is List<*> -> this
         is FirElement -> children()
-        is Pair<*, *> -> second.toChildren()
+        is FirTreeElement -> value.children()
         else -> emptyList<Any>()
     }
 
@@ -90,17 +104,20 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
         tree: JTree?, incoming: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean,
     ): Component {
         val (prefix, value) = when (incoming) {
-            is Pair<*, *> -> (incoming.first?.let { "$it: " } ?: "") to incoming.second
+            is FirTreeElement -> when {
+                incoming.propertyName == null -> ""
+                incoming.propertyKind == FirTreeElement.PropertyKind.SINGLE ->
+                    "${incoming.propertyName}: "
+                incoming.propertyKind == FirTreeElement.PropertyKind.ARRAY ->
+                    "${incoming.propertyName} ∋ "
+                else -> ""
+            } to incoming.value
             else -> "" to incoming
         }
         val name = when (value) {
             null -> "?"
             is String -> value
-            is List<*> -> "declarations"
-            is Pair<*, *> -> {
-                val second = value.second!!::class.simpleName?.withoutImpl() ?: "?"
-                value.first?.let { "$it: $second" } ?: second
-            }
+            is List<*> -> "<list>"
             else -> value::class.simpleName?.withoutImpl() ?: "?"
         }
         val addition = when (value) {
@@ -132,10 +149,15 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
             else -> ""
         }
         val label = "$prefix$name$addition"
-        return when (val icon = (value as? FirElement)?.icon) {
-            null -> JLabel(label)
+        val labelComponent = when (val icon = (value as? FirElement)?.icon) {
+            null -> Label(label)
             else -> JLabel(label, icon, SwingConstants.LEFT)
         }
+        if (value is FirElement && value.source == null) {
+            labelComponent.font = labelComponent.font.deriveFont(Font.ITALIC)
+            labelComponent.foreground = JBColor.DARK_GRAY
+        }
+        return labelComponent
     }
 }
 
@@ -162,26 +184,36 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
         }
     }
 
-fun FirElement.children(): List<Pair<String?, FirElement>> = when (this) {
+fun FirElement.children(): List<FirTreeElement> = when (this) {
     is FirPureAbstractElement -> children()
     else -> emptyList()
 }
 
-fun FirPureAbstractElement.children(): List<Pair<String?, FirElement>> =
+fun FirPureAbstractElement.children(): List<FirTreeElement> =
     ReadAction.compute<_, Throwable> {
-        val properties: List<KProperty1<FirPureAbstractElement, *>> = this::class.memberProperties.toList() as List<KProperty1<FirPureAbstractElement, *>>
-        val propertiesWithValues = properties.map { it to it.get(this) }
+        @Suppress("UNCHECKED_CAST")
+        val properties: List<KProperty1<FirPureAbstractElement, *>> =
+            this::class.memberProperties.toList() as List<KProperty1<FirPureAbstractElement, *>>
+        val propertiesWithValues =
+            properties.filter { it.visibility == KVisibility.PUBLIC }.map { it to it.get(this) }
         buildList {
             this@children.acceptChildren(object : FirVisitorVoid() {
                 override fun visitElement(element: FirElement) {
-                    var propertyName = propertiesWithValues.firstOrNull { it.second == element }?.first?.name
-                    if (propertyName == null) {
-                        propertyName = propertiesWithValues.firstOrNull {
+                    val singleProperty =
+                        propertiesWithValues.firstOrNull { it.second == element }
+                    if (singleProperty != null) {
+                        add(FirTreeElement(singleProperty.first.name, FirTreeElement.PropertyKind.SINGLE, element))
+                        return
+                    }
+                    val arrayProperty =
+                        propertiesWithValues.firstOrNull {
                             val collection = it.second as? Collection<*>
                             collection != null && element in collection
-                        }?.first?.name?.let { "$it[]" }
+                        }
+                    if (arrayProperty != null) {
+                        add(FirTreeElement(arrayProperty.first.name, FirTreeElement.PropertyKind.ARRAY, element))
+                        return
                     }
-                    add(propertyName to element)
                 }
 
                 override fun visitDeclarationStatus(declarationStatus: FirDeclarationStatus) {
