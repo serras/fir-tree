@@ -84,6 +84,7 @@ data class FirTreeElement(
     }
 }
 
+@Suppress("EmptyFunctionBlock")
 class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor): TreeModel {
     override fun getRoot(): Any = declarations
 
@@ -108,85 +109,97 @@ class FirCellRenderer(private val useFqNames: Boolean = true): TreeCellRenderer 
     override fun getTreeCellRendererComponent(
         tree: JTree?, incoming: Any?, selected: Boolean, expanded: Boolean, leaf: Boolean, row: Int, hasFocus: Boolean,
     ): Component {
-        val (prefix, value) = when (incoming) {
-            is FirTreeElement -> when {
-                incoming.propertyName == null -> ""
-                incoming.propertyKind == FirTreeElement.PropertyKind.SINGLE ->
-                    "${incoming.propertyName}: "
-                incoming.propertyKind == FirTreeElement.PropertyKind.ARRAY ->
-                    "${incoming.propertyName} ∋ "
-                else -> ""
-            } to incoming.value
-            else -> "" to incoming
-        }
+        val (prefix, value) = splitTreeCell(incoming)
         val name = when (value) {
             null -> "?"
             is String -> value
             is List<*> -> "<list>"
             else -> value::class.simpleName?.withoutImpl() ?: "?"
         }
-        val addition = when (value) {
-            is FirDeclaration -> {
-                val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
-                val origin = when (value.origin) {
-                    is FirDeclarationOrigin.Synthetic -> "<synthetic>"
-                    FirDeclarationOrigin.IntersectionOverride -> "<intersection override>"
-                    is FirDeclarationOrigin.SubstitutionOverride -> "<substitution override>"
-                    else -> null
-                }
-                val additionalInfo = when (value) {
-                    is FirConstructor -> "isPrimary: ${value.isPrimary}"
-                    is FirVariable -> when {
-                        value.isVal -> "val"
-                        value.isVar -> "var"
-                        else -> null
-                    }
-                    else -> null
-                }
-                listOfNotNull(shownName, origin, additionalInfo).takeIf { it.isNotEmpty() }?.let { " (${it.joinToString()})" } ?: ""
-            }
-            is FirStatement -> {
-                val additionalInfo = when (value) {
-                    is FirConstExpression<*> -> "value: ${value.value}"
-                    is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
-                    is FirAssignmentOperatorStatement -> "operator: ${value.operation.name}"
-                    is FirTypeOperatorCall -> "operator: ${value.operation.name}"
-                    is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
-                    else -> null
-                }
-                val typeInfo = when (value is FirExpression && value !is FirLazyBlock && value !is FirLazyExpression && value.isResolved) {
-                    false -> null
-                    true -> "type: ${value.resolvedType.shownName(useFqNames)}"
-                }
-                listOfNotNull(additionalInfo, typeInfo).takeIf { it.isNotEmpty() }?.let { " (${it.joinToString()})" } ?: ""
-            }
-            is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
-            is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
-                null -> ""
-                else -> " (type: ${coneType.shownName(useFqNames)})"
-            }
-            is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
-                null -> " (name: ${value.name.asString()})"
-                else -> " (resolvedSymbol: $symbolName)"
-            }
-            is FirNamedReference -> " (name: ${value.name.asString()})"
-            else -> ""
-        }
+        val addition = getTreeCellAddition(value)
         val label = "$prefix$name$addition"
         val labelComponent = when (val icon = (value as? FirElement)?.icon) {
             null -> Label(label)
             else -> JLabel(label, icon, SwingConstants.LEFT)
         }
-        if (value is FirElement && value !is FirLazyBlock && value !is FirLazyExpression && value.source == null) {
+        if (value is FirElement && !value.isLazy && value.source == null) {
             labelComponent.font = labelComponent.font.deriveFont(Font.ITALIC)
             labelComponent.foreground = JBColor.DARK_GRAY
         }
         return labelComponent
     }
+
+    private fun splitTreeCell(incoming: Any?): Pair<String, Any?> = when (incoming) {
+        is FirTreeElement -> when {
+            incoming.propertyName == null -> ""
+            incoming.propertyKind == FirTreeElement.PropertyKind.SINGLE ->
+            "${incoming.propertyName}: "
+            incoming.propertyKind == FirTreeElement.PropertyKind.ARRAY ->
+            "${incoming.propertyName} ∋ "
+            else -> ""
+        } to incoming.value
+        else -> "" to incoming
+    }
+
+    private fun getTreeCellAddition(value: Any?): String = when (value) {
+        is FirDeclaration -> {
+            val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
+            val origin = when (value.origin) {
+                is FirDeclarationOrigin.Synthetic -> "<synthetic>"
+                FirDeclarationOrigin.IntersectionOverride -> "<intersection override>"
+                is FirDeclarationOrigin.SubstitutionOverride -> "<substitution override>"
+                else -> null
+            }
+            val additionalInfo = when (value) {
+                is FirConstructor -> "isPrimary: ${value.isPrimary}"
+                is FirVariable -> when {
+                    value.isVal -> "val"
+                    value.isVar -> "var"
+                    else -> null
+                }
+                else -> null
+            }
+            listOfNotNull(shownName, origin, additionalInfo)
+                .takeIf { it.isNotEmpty() }
+                ?.let { " (${it.joinToString()})" } ?: ""
+        }
+        is FirStatement -> {
+            val additionalInfo = when (value) {
+                is FirConstExpression<*> -> "value: ${value.value}"
+                is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
+                is FirAssignmentOperatorStatement -> "operator: ${value.operation.name}"
+                is FirTypeOperatorCall -> "operator: ${value.operation.name}"
+                is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
+                else -> null
+            }
+            val typeInfo = when (value is FirExpression && !value.isLazy && value.isResolved) {
+                false -> null
+                true -> "type: ${value.resolvedType.shownName(useFqNames)}"
+            }
+            listOfNotNull(additionalInfo, typeInfo)
+                .takeIf { it.isNotEmpty() }
+                ?.let { " (${it.joinToString()})" } ?: ""
+        }
+        is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
+        is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
+            null -> ""
+            else -> " (type: ${coneType.shownName(useFqNames)})"
+        }
+        is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
+            null -> " (name: ${value.name.asString()})"
+            else -> " (resolvedSymbol: $symbolName)"
+        }
+        is FirNamedReference -> " (name: ${value.name.asString()})"
+        else -> ""
+    }
 }
 
+val FirElement.isLazy get() = this is FirLazyBlock || this is FirLazyExpression
+
+const val IMPL_SUFFIX: String = "Impl"
+
 fun String.withoutImpl(): String =
-    if (this.endsWith("Impl")) this.dropLast(4) else this
+    if (this.endsWith(IMPL_SUFFIX)) this.dropLast(IMPL_SUFFIX.length) else this
 
 fun ConeKotlinType.shownName(useFqNames: Boolean): String =
     if (useFqNames) renderReadableWithFqNames() else renderReadable()

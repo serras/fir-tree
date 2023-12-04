@@ -134,13 +134,15 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
             .submit(AppExecutorUtil.getAppExecutorService())
     }
 
-    @Suppress("UnstableApiUsage")
+    @Suppress("UnstableApiUsage", "ReturnCount")
     @OptIn(SymbolInternals::class)
     private fun computeInfo(project: Project, file: VirtualFile): List<FirDeclaration>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
             val module = ktFile.moduleInfo.toKtModule()
-            val session = project.getService(LLFirResolveSessionService::class.java).getFirResolveSessionNoCaching(module)
+            val session =
+                project.getService(LLFirResolveSessionService::class.java)
+                    .getFirResolveSessionNoCaching(module)
             return ktFile.declarations.map { session.resolveToFirSymbol(it, currentResolveChoice).fir }
         } catch(_: Exception) {
             return null
@@ -148,10 +150,11 @@ class FirToolWindow: ToolWindowFactory, DumbAware {
     }
 }
 
+@Suppress("EmptyFunctionBlock")
 object EmptyTreeModel: TreeModel {
     override fun getRoot(): Any = "<root>"
     override fun getChild(parent: Any?, index: Int): Any =
-        throw IllegalArgumentException()
+        throw IllegalArgumentException("no children")
     override fun getChildCount(parent: Any?): Int = 0
     override fun getIndexOfChild(parent: Any?, child: Any?): Int = -1
     override fun isLeaf(node: Any?): Boolean = true
