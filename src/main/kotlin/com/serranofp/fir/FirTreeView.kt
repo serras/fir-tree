@@ -5,7 +5,10 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.Label
+import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.FirLabel
+import org.jetbrains.kotlin.fir.FirPackageDirective
 import org.jetbrains.kotlin.fir.FirPureAbstractElement
 import org.jetbrains.kotlin.fir.contracts.FirContractDescription
 import org.jetbrains.kotlin.fir.declarations.FirAnonymousFunction
@@ -14,15 +17,18 @@ import org.jetbrains.kotlin.fir.declarations.FirConstructor
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus
+import org.jetbrains.kotlin.fir.declarations.FirField
 import org.jetbrains.kotlin.fir.declarations.FirFunction
+import org.jetbrains.kotlin.fir.declarations.FirImport
+import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirReceiverParameter
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
-import org.jetbrains.kotlin.fir.declarations.FirResolvedDeclarationStatus
 import org.jetbrains.kotlin.fir.declarations.FirTypeAlias
 import org.jetbrains.kotlin.fir.declarations.FirTypeParameter
 import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.ExhaustivenessStatus
+import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirAssignmentOperatorStatement
 import org.jetbrains.kotlin.fir.expressions.FirBlock
@@ -85,8 +91,8 @@ data class FirTreeElement(
 }
 
 @Suppress("EmptyFunctionBlock")
-class FirTreeModel(private val declarations: List<FirElement>, internal val editor: TextEditor) : TreeModel {
-    override fun getRoot(): Any = declarations
+class FirTreeModel(private val topLevel: List<FirElement>, internal val editor: TextEditor) : TreeModel {
+    override fun getRoot(): Any = topLevel
 
     private fun Any?.toChildren(): List<*> = when (this) {
         is List<*> -> this
@@ -150,8 +156,42 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
         else -> "" to incoming
     }
 
-    @Suppress("CyclomaticComplexMethod")
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     private fun getTreeCellAddition(value: Any?): String = when (value) {
+        is FirPackageDirective -> " (package: ${value.packageFqName.asString()})"
+
+        is FirImport -> {
+            val imported = value.importedFqName?.let { "imported: ${it.asString()}" }
+            val allUnder = if (value.isAllUnder) "*" else null
+            val alias = value.aliasName?.let { "alias: ${it.asString()}" }
+            parensList(imported, allUnder, alias)
+        }
+
+        is FirDeclarationStatus -> {
+            parensList(
+                "visibility: ${value.visibility.internalDisplayName}",
+                value.modality?.let { "modality: ${it.name}" },
+                "actual".takeIf { value.isActual },
+                "companion".takeIf { value.isCompanion },
+                "const".takeIf { value.isConst },
+                "data".takeIf { value.isData },
+                "expect".takeIf { value.isExpect },
+                "external".takeIf { value.isExternal },
+                "fun".takeIf { value.isFun },
+                "infix".takeIf { value.isInfix },
+                "inline".takeIf { value.isInline },
+                "inner".takeIf { value.isInner },
+                "lateinit".takeIf { value.isLateInit },
+                "operator".takeIf { value.isOperator },
+                "override".takeIf { value.isOverride },
+                "static".takeIf { value.isStatic },
+                "suspend".takeIf { value.isSuspend },
+                "tailrec".takeIf { value.isTailRec },
+            )
+        }
+
+        is FirLabel -> " (name: ${value.name})"
+
         is FirDeclaration -> {
             val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
             val origin = when (value.origin) {
@@ -170,9 +210,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
 
                 else -> null
             }
-            listOfNotNull(shownName, origin, additionalInfo)
-                .takeIf { it.isNotEmpty() }
-                ?.let { " (${it.joinToString()})" } ?: ""
+            parensList(shownName, origin, additionalInfo)
         }
 
         is FirStatement -> {
@@ -188,12 +226,12 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
                 false -> null
                 true -> "type: ${value.resolvedType.shownName(useFqNames)}"
             }
-            listOfNotNull(additionalInfo, typeInfo)
-                .takeIf { it.isNotEmpty() }
-                ?.let { " (${it.joinToString()})" } ?: ""
+            parensList(additionalInfo, typeInfo)
         }
 
-        is FirArgumentList -> if (value.arguments.isEmpty()) " (empty)" else ""
+        is FirArgumentList ->
+            if (value.arguments.isEmpty()) " (empty)" else ""
+
         is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
             null -> ""
             else -> " (type: ${coneType.shownName(useFqNames)})"
@@ -205,6 +243,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
         }
 
         is FirNamedReference -> " (name: ${value.name.asString()})"
+
         else -> ""
     }
 }
@@ -243,6 +282,11 @@ fun ExhaustivenessStatus?.shown(): String = when (this) {
     is ExhaustivenessStatus.NotExhaustive -> "NotExhaustive"
 }
 
+fun parensList(vararg elements: String?) =
+    elements.filterNotNull()
+        .takeIf { it.isNotEmpty() }
+        ?.let { " (${it.joinToString()})" } ?: ""
+
 fun FirElement.children(): List<FirTreeElement> = when (this) {
     is FirLazyBlock -> emptyList()
     is FirLazyExpression -> emptyList()
@@ -277,14 +321,6 @@ fun FirPureAbstractElement.children(): List<FirTreeElement> =
                     }
                 }
 
-                override fun visitDeclarationStatus(declarationStatus: FirDeclarationStatus) {
-                    /* do nothing */
-                }
-
-                override fun visitResolvedDeclarationStatus(resolvedDeclarationStatus: FirResolvedDeclarationStatus) {
-                    /* do nothing */
-                }
-
                 override fun visitControlFlowGraphReference(controlFlowGraphReference: FirControlFlowGraphReference) {
                     /* do nothing */
                 }
@@ -297,27 +333,36 @@ val FirElement.icon: Icon?
         is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.ErrorIntroduction
         is FirAnonymousFunction -> AllIcons.Nodes.Lambda
         is FirLambdaArgumentExpression -> AllIcons.Debugger.LambdaBreakpoint
-        is FirConstructor -> KotlinIcons.CLASS_INITIALIZER
-        is FirFunction -> KotlinIcons.FUNCTION
-        is FirRegularClass -> KotlinIcons.CLASS
-        is FirAnonymousObject -> KotlinIcons.OBJECT
-        is FirTypeParameter, is FirReceiverParameter, is FirValueParameter -> KotlinIcons.PARAMETER
+        is FirConstructor -> AllIcons.Nodes.ClassInitializer
+        is FirFunction -> AllIcons.Nodes.Function
+        is FirRegularClass -> AllIcons.Nodes.Class
+        is FirAnonymousObject -> AllIcons.Nodes.AnonymousClass
+        is FirTypeParameter -> AllIcons.Nodes.Type
+        is FirReceiverParameter, is FirValueParameter -> AllIcons.Nodes.Parameter
         is FirTypeAlias -> KotlinIcons.TYPE_ALIAS
-        is FirVariable -> KotlinIcons.VAL
-        is FirTypeRef -> AllIcons.Actions.InlayRenameInComments
-        is FirReference -> AllIcons.Diff.ApplyNotConflicts
+        is FirField -> AllIcons.Nodes.Field
+        is FirProperty -> AllIcons.Nodes.Property
+        is FirVariable -> AllIcons.Nodes.Variable
+        is FirTypeRef -> AllIcons.Actions.GroupByTestProduction
+        is FirReference -> AllIcons.Actions.GroupByModule
         is FirConstExpression<*> -> AllIcons.Nodes.Constant
         is FirReturnExpression -> AllIcons.Actions.StepOut
         is FirVariableAssignment -> AllIcons.Vcs.Equal
-        is FirDelegatedConstructorCall -> AllIcons.Nodes.Alias
+        is FirDelegatedConstructorCall -> AllIcons.Actions.Forward
         is FirLoop -> AllIcons.Gutter.RecursiveMethod
         is FirWhenExpression -> AllIcons.Vcs.Merge
         is FirBlock -> AllIcons.FileTypes.Json
         is FirWhenBranch -> AllIcons.Vcs.CommitNode
+        is FirAnnotationCall -> AllIcons.Gutter.ExtAnnotation
         is FirExpression -> AllIcons.Debugger.Value
         is FirStatement -> AllIcons.Debugger.Db_muted_disabled_method_breakpoint
         is FirTypeProjection -> AllIcons.Nodes.Type
         is FirContractDescription -> AllIcons.Nodes.Template
         is FirArgumentList -> AllIcons.Debugger.VariablesTab
+        is FirImport -> AllIcons.ToolbarDecorator.Import
+        is FirPackageDirective -> AllIcons.Nodes.Package
+        is FirLabel -> AllIcons.Nodes.Tag
+        is FirAnnotationContainer -> AllIcons.Gutter.ExtAnnotation
+        is FirDeclarationStatus -> AllIcons.Actions.GroupBy
         else -> null
     }

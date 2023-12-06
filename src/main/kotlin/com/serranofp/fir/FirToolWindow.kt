@@ -25,12 +25,15 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionService
+import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtFile
 import java.util.concurrent.Callable
 import javax.swing.BorderFactory
@@ -139,17 +142,29 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
 
     @Suppress("ReturnCount")
     @OptIn(SymbolInternals::class)
-    private fun computeInfo(project: Project, file: VirtualFile): List<FirDeclaration>? {
+    private fun computeInfo(project: Project, file: VirtualFile): List<FirElement>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
             val module = ProjectStructureProvider.getModule(project, ktFile, null)
             val session =
                 project.getService(LLFirResolveSessionService::class.java)
                     .getFirResolveSessionNoCaching(module)
-            return ktFile.declarations.map { session.resolveToFirSymbol(it, currentResolveChoice).fir }
+            val allButDeclarations = computeAllButDeclarations(ktFile.getOrBuildFirFile(session))
+            val declarations = ktFile.declarations.map { session.resolveToFirSymbol(it, currentResolveChoice).fir }
+            return allButDeclarations + declarations
         } catch (_: Exception) {
             return null
         }
+    }
+
+    private fun computeAllButDeclarations(file: FirFile): List<FirElement> = buildList {
+        file.acceptChildren(object : FirVisitorVoid() {
+            override fun visitElement(element: FirElement) {
+                if (element !is FirDeclaration) {
+                    add(element)
+                }
+            }
+        })
     }
 }
 
