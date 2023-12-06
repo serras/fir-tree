@@ -25,13 +25,12 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionService
+import org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.idea.base.projectStructure.moduleInfo
-import org.jetbrains.kotlin.idea.base.projectStructure.toKtModule
 import org.jetbrains.kotlin.psi.KtFile
 import java.util.concurrent.Callable
 import javax.swing.BorderFactory
@@ -138,12 +137,12 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             .submit(AppExecutorUtil.getAppExecutorService())
     }
 
-    @Suppress("UnstableApiUsage", "ReturnCount")
+    @Suppress("ReturnCount")
     @OptIn(SymbolInternals::class)
     private fun computeInfo(project: Project, file: VirtualFile): List<FirDeclaration>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
-            val module = ktFile.moduleInfo.toKtModule()
+            val module = ProjectStructureProvider.getModule(project, ktFile, null)
             val session =
                 project.getService(LLFirResolveSessionService::class.java)
                     .getFirResolveSessionNoCaching(module)
