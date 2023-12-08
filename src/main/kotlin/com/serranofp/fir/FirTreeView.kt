@@ -126,6 +126,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
             null -> "?"
             is String -> value
             is List<*> -> "<list>"
+            is FirProblemElement -> "error analyzing ${value.name} (${value.message}}"
             else -> value::class.simpleName?.withoutImpl() ?: "?"
         }
         val addition = getTreeCellAddition(value)
@@ -330,7 +331,7 @@ fun FirPureAbstractElement.children(): List<FirTreeElement> =
 
 val FirElement.icon: Icon?
     get() = when (this) {
-        is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.ErrorIntroduction
+        is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.WarningIntroduction
         is FirAnonymousFunction -> AllIcons.Nodes.Lambda
         is FirLambdaArgumentExpression -> AllIcons.Debugger.LambdaBreakpoint
         is FirConstructor -> AllIcons.Nodes.ClassInitializer
@@ -364,5 +365,6 @@ val FirElement.icon: Icon?
         is FirLabel -> AllIcons.Nodes.Tag
         is FirAnnotationContainer -> AllIcons.Gutter.ExtAnnotation
         is FirDeclarationStatus -> AllIcons.Actions.GroupBy
+        is FirProblemElement -> AllIcons.Nodes.ErrorIntroduction
         else -> null
     }

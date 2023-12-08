@@ -24,6 +24,8 @@ import com.intellij.ui.layout.selected
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
+import org.jetbrains.kotlin.KtRealSourceElementKind
+import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionService
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider
@@ -33,8 +35,12 @@ import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.visitors.FirTransformer
+import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
+import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.toKtPsiSourceElement
 import java.util.concurrent.Callable
 import javax.swing.BorderFactory
 import javax.swing.event.TreeModelListener
@@ -150,9 +156,15 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
                 project.getService(LLFirResolveSessionService::class.java)
                     .getFirResolveSessionNoCaching(module)
             val allButDeclarations = computeAllButDeclarations(ktFile.getOrBuildFirFile(session))
-            val declarations = ktFile.declarations.map { session.resolveToFirSymbol(it, currentResolveChoice).fir }
+            val declarations = ktFile.declarations.map {
+                try {
+                    session.resolveToFirSymbol(it, currentResolveChoice).fir
+                } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
+                    FirProblemElement(it, e)
+                }
+            }
             return allButDeclarations + declarations
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             return null
         }
     }
@@ -181,4 +193,16 @@ object EmptyTreeModel : TreeModel {
     override fun valueForPathChanged(path: TreePath?, newValue: Any?) {}
     override fun addTreeModelListener(l: TreeModelListener?) {}
     override fun removeTreeModelListener(l: TreeModelListener?) {}
+}
+
+class FirProblemElement(declaration: KtDeclaration, problem: Throwable): FirElement {
+    override val source: KtSourceElement =
+        declaration.toKtPsiSourceElement(KtRealSourceElementKind)
+
+    val name: String? = declaration.name
+    val message: String? = problem.message
+
+    @Suppress("EmptyFunctionBlock")
+    override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) { }
+    override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirElement = this
 }
