@@ -1,6 +1,8 @@
-# FIR Tree <iframe width="245px" height="48px" src="https://plugins.jetbrains.com/embeddable/install/23270"></iframe>
+# FIR Tree
 
 > Visualize Kotlin's Frontend Intermediate Representation (FIR) right in your IDE
+
+### Available at [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/23270-fir-tree)
 
 This plug-in helps you to understand the way the K2 Kotlin compiler represents the code internally.
 
