@@ -195,7 +195,7 @@ object EmptyTreeModel : TreeModel {
     override fun removeTreeModelListener(l: TreeModelListener?) {}
 }
 
-class FirProblemElement(declaration: KtDeclaration, problem: Throwable): FirElement {
+class FirProblemElement(declaration: KtDeclaration, problem: Throwable) : FirElement {
     override val source: KtSourceElement =
         declaration.toKtPsiSourceElement(KtRealSourceElementKind)
 
