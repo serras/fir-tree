@@ -32,7 +32,6 @@ import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirAssignmentOperatorStatement
 import org.jetbrains.kotlin.fir.expressions.FirBlock
-import org.jetbrains.kotlin.fir.expressions.FirConstExpression
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirLambdaArgumentExpression
@@ -217,12 +216,18 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
 
         is FirStatement -> {
             val additionalInfo = when (value) {
-                is FirConstExpression<*> -> "value: ${value.value}"
                 is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
                 is FirAssignmentOperatorStatement -> "operator: ${value.operation.name}"
                 is FirTypeOperatorCall -> "operator: ${value.operation.name}"
                 is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
-                else -> null
+                // hack: different versions call FirConstExpression or FirLiteralExpression
+                // is FirConstExpression<*> -> "value: ${value.value}"
+                else -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val valueProperty =
+                        value::class.memberProperties.find { it.name == "value" } as? KProperty1<FirStatement, Any?>
+                    valueProperty?.get(value)?.let { "value: $it" }
+                }
             }
             val typeInfo = when (value is FirExpression && !value.isLazy && value.isResolved) {
                 false -> null
@@ -347,7 +352,7 @@ val FirElement.icon: Icon?
         is FirVariable -> AllIcons.Nodes.Variable
         is FirTypeRef -> AllIcons.Actions.GroupByTestProduction
         is FirReference -> AllIcons.Actions.GroupByModule
-        is FirConstExpression<*> -> AllIcons.Nodes.Constant
+        // is FirConstExpression<*> -> AllIcons.Nodes.Constant
         is FirReturnExpression -> AllIcons.Actions.StepOut
         is FirVariableAssignment -> AllIcons.Vcs.Equal
         is FirDelegatedConstructorCall -> AllIcons.Actions.Forward
