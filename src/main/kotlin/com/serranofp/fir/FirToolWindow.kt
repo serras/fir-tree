@@ -15,7 +15,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.psi.PsiManager
-import com.intellij.ui.JBColor
 import com.intellij.ui.components.CheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
@@ -45,6 +44,7 @@ import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.toKtPsiSourceElement
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -129,7 +129,7 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             val browser = JBCefBrowser()
             browser.loadHTML(mermaidHtml(graph))
             val frame = JFrame()
-            browser.component.background = JBColor.WHITE
+            browser.component.background = Color.white
             frame.contentPane = browser.component
             frame.size = Dimension(800, 800)
             frame.title = when (selected) {

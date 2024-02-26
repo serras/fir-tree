@@ -11,11 +11,15 @@ import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNode
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNodeWithSubgraphs
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.EnterNodeMarker
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ExitNodeMarker
+import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
+import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.renderReadable
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties
 
@@ -34,8 +38,14 @@ fun mermaidHtml(content: String) = """
 """
 
 val FirReference.nameIfAvailable: String get() = when (this) {
+    is FirThisReference -> "this"
     is FirResolvedNamedReference -> this.name.asString()
-    else -> "unknown"
+    else -> "?"
+}
+
+val FirTypeRef.nameIfAvailable: String get() = when (this) {
+    is FirResolvedTypeRef -> this.type.renderReadable()
+    else -> "?"
 }
 
 val CFGNode<*>.niceLabel: String get() {
@@ -55,7 +65,7 @@ val CFGNode<*>.niceLabel: String get() {
         theFir is FirBinaryLogicExpression -> ": **${theFir.kind.token}**"
         theFir is FirComparisonExpression -> ": **${theFir.operation.operator}**"
         theFir is FirEqualityOperatorCall -> ": **${theFir.operation.operator}**"
-        theFir is FirTypeOperatorCall -> ": **${theFir.operation.operator}**"
+        theFir is FirTypeOperatorCall -> ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable}**"
         else -> ""
     }
 
