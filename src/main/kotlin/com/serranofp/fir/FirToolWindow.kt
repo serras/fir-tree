@@ -1,5 +1,6 @@
 package com.serranofp.fir
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.editor.ScrollType
@@ -14,12 +15,14 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.psi.PsiManager
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.CheckBox
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.gridLayout.UnscaledGaps
+import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.layout.selected
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -30,6 +33,7 @@ import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionServic
 import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
 import org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
@@ -41,8 +45,13 @@ import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.toKtPsiSourceElement
+import java.awt.Dimension
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.util.concurrent.Callable
 import javax.swing.BorderFactory
+import javax.swing.JButton
+import javax.swing.JFrame
 import javax.swing.event.TreeModelListener
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
@@ -56,6 +65,10 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
         FirResolvePhase.entries.toTypedArray()
     )
     private val fq = CheckBox("Fully qualified names", selected = false)
+    private val cfg = JButton(AllIcons.Graph.Layout).apply {
+        this.toolTipText = "Control Flow Graph"
+        this.isEnabled = false
+    }
 
     private var inProgressAction: CancellablePromise<*>? = null
     private var status: Pair<VirtualFile, TextEditor>? = null
@@ -67,9 +80,10 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
         // set up UI
         val ui = panel {
             row {
-                label("Resolve up to phase:").customize(UnscaledGaps(left = 10))
+                label("Resolve up to:").customize(UnscaledGaps(left = 10))
                 cell(choices).align(Align.FILL).customize(UnscaledGaps(left = 5, right = 5)).resizableColumn()
                 cell(fq).customize(UnscaledGaps(left = 5, right = 10))
+                cell(cfg).customize(UnscaledGaps(0)).align(Align.CENTER)
             }
             row {
                 val scrollPane = JBScrollPane(tree).also {
@@ -99,11 +113,42 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             val lastComponent = event.path.lastPathComponent
             val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement)
             val source = selected?.takeIf { it !is FirLazyBlock }?.source
+
+            cfg.isEnabled = selected != null && selected is FirControlFlowGraphOwner
+
             if (model == null || source == null) return@addTreeSelectionListener
             model.editor.editor.caretModel.moveToOffset(source.startOffset)
             model.editor.editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
             model.editor.editor.selectionModel.setSelection(source.startOffset, source.endOffset)
         }
+
+        fun showCfgOfSelectedElement() {
+            val selected = tree.lastSelectedPathComponent as? FirControlFlowGraphOwner ?: return
+            val graph = selected.graph() ?: return
+
+            val browser = JBCefBrowser()
+            browser.loadHTML(mermaidHtml(graph))
+            val frame = JFrame()
+            browser.component.background = JBColor.WHITE
+            frame.contentPane = browser.component
+            frame.size = Dimension(800, 800)
+            frame.title = when (selected) {
+                is FirDeclaration -> "Control Flow Graph of '${selected.symbol.shownName(true)}'"
+                else -> "Control Flow Graph"
+            }
+            frame.isVisible = true
+        }
+
+        cfg.addActionListener {
+            showCfgOfSelectedElement()
+        }
+
+        tree.addMouseListener(object: MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent?) {
+                if (e == null || e.clickCount != 2) return
+                showCfgOfSelectedElement()
+            }
+        })
 
         // start listening for selected file editors
         project.messageBus.connect()
