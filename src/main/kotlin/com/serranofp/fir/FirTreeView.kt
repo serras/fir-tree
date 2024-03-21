@@ -34,7 +34,6 @@ import org.jetbrains.kotlin.fir.expressions.FirAssignmentOperatorStatement
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
-import org.jetbrains.kotlin.fir.expressions.FirLambdaArgumentExpression
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
 import org.jetbrains.kotlin.fir.expressions.FirLoop
@@ -339,7 +338,6 @@ val FirElement.icon: Icon?
     get() = when (this) {
         is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.WarningIntroduction
         is FirAnonymousFunction -> AllIcons.Nodes.Lambda
-        is FirLambdaArgumentExpression -> AllIcons.Debugger.LambdaBreakpoint
         is FirConstructor -> AllIcons.Nodes.ClassInitializer
         is FirFunction -> AllIcons.Nodes.Function
         is FirRegularClass -> AllIcons.Nodes.Class
