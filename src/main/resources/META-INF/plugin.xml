@@ -13,7 +13,7 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
-    <description>Show the FIR (Frontend Intermediate Representation) tree from a Kotlin file</description>
+    <description>Visualize the FIR (Frontend Intermediate Representation) and CFG (Control Flow Graph) from a Kotlin file</description>
 
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
@@ -25,9 +25,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow factoryClass="com.serranofp.fir.FirToolWindow" id="FIR Tree" icon="/icons/fir.svg" />
         <projectService
-                serviceInterface="org.jetbrains.kotlin.analysis.low.level.api.fir.api.services.FirSealedClassInheritorsProcessorFactory"
-                serviceImplementation="org.jetbrains.kotlin.idea.fir.low.level.api.ide.FirSealedClassInheritorsProcessorFactoryIdeImpl"/>
-
+                serviceInterface="org.jetbrains.kotlin.analysis.providers.KotlinSealedInheritorsProviderFactory"
+                serviceImplementation="org.jetbrains.kotlin.idea.base.fir.analysisApiProviders.FirIdeKotlinSealedInheritorsProviderFactory"/>
         <projectService serviceInterface="org.jetbrains.kotlin.analysis.low.level.api.fir.project.structure.LLFirLibrarySymbolProviderFactory"
                         serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.stubBased.deserialization.LLStubBasedLibrarySymbolProviderFactory"/>
         <projectService serviceImplementation="org.jetbrains.kotlin.analysis.low.level.api.fir.project.structure.LLFirBuiltinsSessionFactory"/>

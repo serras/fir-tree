@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.2.2"
+version = "0.3.0"
 
 repositories {
     mavenCentral()
@@ -21,9 +21,10 @@ dependencies {
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    version.set("2023.3")
+    version.set("2024.1")
     type.set("IC") // Target IDE Platform
-    plugins.set(listOf("org.jetbrains.kotlin"))
+    plugins.set(listOf("org.jetbrains.kotlin", "com.intellij.java"))
+    downloadSources.set(true)
 }
 
 tasks {
@@ -35,6 +36,9 @@ tasks {
 
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions.jvmTarget = "17"
+        kotlinOptions {
+            compilerOptions.freeCompilerArgs.add("-Xextended-compiler-checks")
+        }
     }
 
     buildSearchableOptions {
@@ -47,7 +51,7 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("233")
+        sinceBuild.set("241")
         untilBuild.set("241.*")
     }
 
