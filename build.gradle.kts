@@ -5,7 +5,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.0.20"
     id("org.jetbrains.intellij.platform") version "2.0.1"
-    id("io.gitlab.arturbosch.detekt") version "1.23.6"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "com.serranofp"
