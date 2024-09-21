@@ -30,12 +30,13 @@ import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.ExhaustivenessStatus
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
-import org.jetbrains.kotlin.fir.expressions.FirAssignmentOperatorStatement
+import org.jetbrains.kotlin.fir.expressions.FirAugmentedAssignment
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
+import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
 import org.jetbrains.kotlin.fir.expressions.FirLoop
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
@@ -157,101 +158,97 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
     }
 
     @Suppress("CyclomaticComplexMethod", "LongMethod")
-    private fun getTreeCellAddition(value: Any?): String = when (value) {
-        is FirPackageDirective -> " (package: ${value.packageFqName.asString()})"
+    private fun getTreeCellAddition(value: Any?): String = try {
+        when (value) {
+            is FirPackageDirective -> " (package: ${value.packageFqName.asString()})"
 
-        is FirImport -> {
-            val imported = value.importedFqName?.let { "imported: ${it.asString()}" }
-            val allUnder = if (value.isAllUnder) "*" else null
-            val alias = value.aliasName?.let { "alias: ${it.asString()}" }
-            parensList(imported, allUnder, alias)
-        }
-
-        is FirDeclarationStatus -> {
-            parensList(
-                "visibility: ${value.visibility.internalDisplayName}",
-                value.modality?.let { "modality: ${it.name}" },
-                "actual".takeIf { value.isActual },
-                "companion".takeIf { value.isCompanion },
-                "const".takeIf { value.isConst },
-                "data".takeIf { value.isData },
-                "expect".takeIf { value.isExpect },
-                "external".takeIf { value.isExternal },
-                "fun".takeIf { value.isFun },
-                "infix".takeIf { value.isInfix },
-                "inline".takeIf { value.isInline },
-                "inner".takeIf { value.isInner },
-                "lateinit".takeIf { value.isLateInit },
-                "operator".takeIf { value.isOperator },
-                "override".takeIf { value.isOverride },
-                "static".takeIf { value.isStatic },
-                "suspend".takeIf { value.isSuspend },
-                "tailrec".takeIf { value.isTailRec },
-            )
-        }
-
-        is FirLabel -> " (name: ${value.name})"
-
-        is FirDeclaration -> {
-            val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
-            val origin = when (value.origin) {
-                is FirDeclarationOrigin.Synthetic -> "<synthetic>"
-                FirDeclarationOrigin.IntersectionOverride -> "<intersection override>"
-                is FirDeclarationOrigin.SubstitutionOverride -> "<substitution override>"
-                else -> null
+            is FirImport -> {
+                val imported = value.importedFqName?.let { "imported: ${it.asString()}" }
+                val allUnder = if (value.isAllUnder) "*" else null
+                val alias = value.aliasName?.let { "alias: ${it.asString()}" }
+                parensList(imported, allUnder, alias)
             }
-            val additionalInfo = when (value) {
-                is FirConstructor -> "isPrimary: ${value.isPrimary}"
-                is FirVariable -> when {
-                    value.isVal -> "val"
-                    value.isVar -> "var"
+
+            is FirDeclarationStatus -> {
+                parensList(
+                    "visibility: ${value.visibility.internalDisplayName}",
+                    value.modality?.let { "modality: ${it.name}" },
+                    "actual".takeIf { value.isActual },
+                    "companion".takeIf { value.isCompanion },
+                    "const".takeIf { value.isConst },
+                    "data".takeIf { value.isData },
+                    "expect".takeIf { value.isExpect },
+                    "external".takeIf { value.isExternal },
+                    "fun".takeIf { value.isFun },
+                    "infix".takeIf { value.isInfix },
+                    "inline".takeIf { value.isInline },
+                    "inner".takeIf { value.isInner },
+                    "lateinit".takeIf { value.isLateInit },
+                    "operator".takeIf { value.isOperator },
+                    "override".takeIf { value.isOverride },
+                    "static".takeIf { value.isStatic },
+                    "suspend".takeIf { value.isSuspend },
+                    "tailrec".takeIf { value.isTailRec },
+                )
+            }
+
+            is FirLabel -> " (name: ${value.name})"
+
+            is FirDeclaration -> {
+                val shownName = value.symbol.shownName(useFqNames)?.let { "name: $it" }
+                val origin = when (value.origin) {
+                    is FirDeclarationOrigin.Synthetic -> "<synthetic>"
+                    FirDeclarationOrigin.IntersectionOverride -> "<intersection override>"
+                    is FirDeclarationOrigin.SubstitutionOverride -> "<substitution override>"
                     else -> null
                 }
+                val additionalInfo = when (value) {
+                    is FirConstructor -> "isPrimary: ${value.isPrimary}"
+                    is FirVariable -> when {
+                        value.isVal -> "val"
+                        value.isVar -> "var"
+                        else -> null
+                    }
 
-                else -> null
-            }
-            parensList(shownName, origin, additionalInfo)
-        }
-
-        is FirStatement -> {
-            val additionalInfo = when (value) {
-                is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
-                is FirAssignmentOperatorStatement -> "operator: ${value.operation.name}"
-                is FirTypeOperatorCall -> "operator: ${value.operation.name}"
-                is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
-                // hack: different versions call FirConstExpression or FirLiteralExpression
-                // is FirConstExpression<*> -> "value: ${value.value}"
-                else -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val valueProperty =
-                        value::class.memberProperties.find { it.name == "value" } as? KProperty1<FirStatement, Any?>
-                    valueProperty?.get(value)?.let { "value: $it" }
+                    else -> null
                 }
+                parensList(shownName, origin, additionalInfo)
             }
-            val typeInfo = when (value is FirExpression && !value.isLazy && value.isResolved) {
-                false -> null
-                true -> "type: ${value.resolvedType.shownName(useFqNames)}"
+
+            is FirStatement -> {
+                val additionalInfo = when (value) {
+                    is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
+                    is FirAugmentedAssignment -> "operator: ${value.operation.name}"
+                    is FirTypeOperatorCall -> "operator: ${value.operation.name}"
+                    is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
+                    is FirLiteralExpression -> "value: ${value.value}"
+                    else -> null
+                }
+                val typeInfo = when (value is FirExpression && !value.isLazy && value.isResolved) {
+                    false -> null
+                    true -> "type: ${value.resolvedType.shownName(useFqNames)}"
+                }
+                parensList(additionalInfo, typeInfo)
             }
-            parensList(additionalInfo, typeInfo)
+
+            is FirArgumentList ->
+                if (value.arguments.isEmpty()) " (empty)" else ""
+
+            is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
+                null -> ""
+                else -> " (type: ${coneType.shownName(useFqNames)})"
+            }
+
+            is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
+                null -> " (name: ${value.name.asString()})"
+                else -> " (resolvedSymbol: $symbolName)"
+            }
+
+            is FirNamedReference -> " (name: ${value.name.asString()})"
+
+            else -> ""
         }
-
-        is FirArgumentList ->
-            if (value.arguments.isEmpty()) " (empty)" else ""
-
-        is FirTypeRef -> when (val coneType = value.coneTypeOrNull) {
-            null -> ""
-            else -> " (type: ${coneType.shownName(useFqNames)})"
-        }
-
-        is FirResolvedNamedReference -> when (val symbolName = value.resolvedSymbol.shownName(useFqNames)) {
-            null -> " (name: ${value.name.asString()})"
-            else -> " (resolvedSymbol: $symbolName)"
-        }
-
-        is FirNamedReference -> " (name: ${value.name.asString()})"
-
-        else -> ""
-    }
+    } catch (_: ReflectiveOperationException) { "" }
 }
 
 val FirElement.isLazy get() = this is FirLazyBlock || this is FirLazyExpression
@@ -335,40 +332,42 @@ fun FirPureAbstractElement.children(): List<FirTreeElement> =
     }
 
 val FirElement.icon: Icon?
-    get() = when (this) {
-        is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.WarningIntroduction
-        is FirAnonymousFunction -> AllIcons.Nodes.Lambda
-        is FirConstructor -> AllIcons.Nodes.ClassInitializer
-        is FirFunction -> AllIcons.Nodes.Function
-        is FirRegularClass -> AllIcons.Nodes.Class
-        is FirAnonymousObject -> AllIcons.Nodes.AnonymousClass
-        is FirTypeParameter -> AllIcons.Nodes.Type
-        is FirReceiverParameter, is FirValueParameter -> AllIcons.Nodes.Parameter
-        is FirTypeAlias -> KotlinIcons.TYPE_ALIAS
-        is FirField -> AllIcons.Nodes.Field
-        is FirProperty -> AllIcons.Nodes.Property
-        is FirVariable -> AllIcons.Nodes.Variable
-        is FirTypeRef -> AllIcons.Actions.GroupByTestProduction
-        is FirReference -> AllIcons.Actions.GroupByModule
-        // is FirConstExpression<*> -> AllIcons.Nodes.Constant
-        is FirReturnExpression -> AllIcons.Actions.StepOut
-        is FirVariableAssignment -> AllIcons.Vcs.Equal
-        is FirDelegatedConstructorCall -> AllIcons.Actions.Forward
-        is FirLoop -> AllIcons.Gutter.RecursiveMethod
-        is FirWhenExpression -> AllIcons.Vcs.Merge
-        is FirBlock -> AllIcons.FileTypes.Json
-        is FirWhenBranch -> AllIcons.Vcs.CommitNode
-        is FirAnnotationCall -> AllIcons.Gutter.ExtAnnotation
-        is FirExpression -> AllIcons.Debugger.Value
-        is FirStatement -> AllIcons.Debugger.Db_muted_disabled_method_breakpoint
-        is FirTypeProjection -> AllIcons.Nodes.Type
-        is FirContractDescription -> AllIcons.Nodes.Template
-        is FirArgumentList -> AllIcons.Debugger.VariablesTab
-        is FirImport -> AllIcons.ToolbarDecorator.Import
-        is FirPackageDirective -> AllIcons.Nodes.Package
-        is FirLabel -> AllIcons.Nodes.Tag
-        is FirAnnotationContainer -> AllIcons.Gutter.ExtAnnotation
-        is FirDeclarationStatus -> AllIcons.Actions.GroupBy
-        is FirProblemElement -> AllIcons.Nodes.ErrorIntroduction
-        else -> null
-    }
+    get() = try {
+        when (this) {
+            is FirErrorTypeRef, is FirErrorNamedReference -> AllIcons.Nodes.WarningIntroduction
+            is FirAnonymousFunction -> AllIcons.Nodes.Lambda
+            is FirConstructor -> AllIcons.Nodes.ClassInitializer
+            is FirFunction -> AllIcons.Nodes.Function
+            is FirRegularClass -> AllIcons.Nodes.Class
+            is FirAnonymousObject -> AllIcons.Nodes.AnonymousClass
+            is FirTypeParameter -> AllIcons.Nodes.Type
+            is FirReceiverParameter, is FirValueParameter -> AllIcons.Nodes.Parameter
+            is FirTypeAlias -> KotlinIcons.TYPE_ALIAS
+            is FirField -> AllIcons.Nodes.Field
+            is FirProperty -> AllIcons.Nodes.Property
+            is FirVariable -> AllIcons.Nodes.Variable
+            is FirTypeRef -> AllIcons.Actions.GroupByTestProduction
+            is FirReference -> AllIcons.Actions.GroupByModule
+            is FirLiteralExpression -> AllIcons.Nodes.Constant
+            is FirReturnExpression -> AllIcons.Actions.StepOut
+            is FirVariableAssignment -> AllIcons.Vcs.Equal
+            is FirDelegatedConstructorCall -> AllIcons.Actions.Forward
+            is FirLoop -> AllIcons.Gutter.RecursiveMethod
+            is FirWhenExpression -> AllIcons.Vcs.Merge
+            is FirBlock -> AllIcons.FileTypes.Json
+            is FirWhenBranch -> AllIcons.Vcs.CommitNode
+            is FirAnnotationCall -> AllIcons.Gutter.ExtAnnotation
+            is FirExpression -> AllIcons.Debugger.Value
+            is FirStatement -> AllIcons.Debugger.Db_muted_disabled_method_breakpoint
+            is FirTypeProjection -> AllIcons.Nodes.Type
+            is FirContractDescription -> AllIcons.Nodes.Template
+            is FirArgumentList -> AllIcons.Debugger.VariablesTab
+            is FirImport -> AllIcons.ToolbarDecorator.Import
+            is FirPackageDirective -> AllIcons.Nodes.Package
+            is FirLabel -> AllIcons.Nodes.Tag
+            is FirAnnotationContainer -> AllIcons.Gutter.ExtAnnotation
+            is FirDeclarationStatus -> AllIcons.Actions.GroupBy
+            is FirProblemElement -> AllIcons.Nodes.ErrorIntroduction
+            else -> null
+        }
+    } catch (_: ReflectiveOperationException) { null }

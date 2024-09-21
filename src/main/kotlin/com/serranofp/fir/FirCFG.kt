@@ -1,12 +1,11 @@
 package com.serranofp.fir
 
+import org.jetbrains.kotlin.contracts.description.LogicOperationKind
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
 import org.jetbrains.kotlin.fir.declarations.FirVariable
-import org.jetbrains.kotlin.fir.expressions.FirBinaryLogicExpression
-import org.jetbrains.kotlin.fir.expressions.FirComparisonExpression
-import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
+import org.jetbrains.kotlin.fir.expressions.FirOperation
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.references.FirReference
@@ -19,6 +18,7 @@ import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ExitNodeMarker
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.coneType // needed in 2024.2.1
 import org.jetbrains.kotlin.fir.types.renderReadable
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties
@@ -47,7 +47,7 @@ val FirReference.nameIfAvailable: String
 
 val FirTypeRef.nameIfAvailable: String
     get() = when (this) {
-        is FirResolvedTypeRef -> this.type.renderReadable()
+        is FirResolvedTypeRef -> this.coneType.renderReadable()
         else -> "?"
     }
 
@@ -64,20 +64,28 @@ val CFGNode<*>.niceLabel: String
         val valueProperty = fir::class.memberProperties.find { it.name == "value" } as? KProperty1<FirElement, Any?>
         val theValue = valueProperty?.get(fir)
 
-        val theFir = fir
-        val extra = when {
-            theValue != null -> ": $theValue"
-            theFir is FirVariable -> ": **${theFir.name.asString().trim('<', '>')}**"
-            theFir is FirSimpleFunction -> ": **${theFir.name.asString().trim('<', '>')}**"
-            theFir is FirQualifiedAccessExpression -> ": **${theFir.calleeReference.nameIfAvailable.trim('<', '>')}**"
-            theFir is FirBinaryLogicExpression -> ": **${theFir.kind.token}**"
-            theFir is FirComparisonExpression -> ": **${theFir.operation.operator}**"
-            theFir is FirEqualityOperatorCall -> ": **${theFir.operation.operator}**"
-            theFir is FirTypeOperatorCall ->
-                ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable.trim('<', '>')}**"
+        @Suppress("UNCHECKED_CAST")
+        val kindProperty = fir::class.memberProperties.find { it.name == "kind" } as? KProperty1<FirElement, Any?>
+        val theKind = kindProperty?.get(fir) as? LogicOperationKind
 
-            else -> ""
-        }
+        @Suppress("UNCHECKED_CAST")
+        val operationProperty = fir::class.memberProperties.find { it.name == "operation" } as? KProperty1<FirElement, Any?>
+        val theOperation = operationProperty?.get(fir) as? FirOperation
+
+        val theFir = fir
+        val extra = try {
+            when {
+                theFir is FirVariable -> ": **${theFir.name.asString().trim('<', '>')}**"
+                theFir is FirSimpleFunction -> ": **${theFir.name.asString().trim('<', '>')}**"
+                theFir is FirQualifiedAccessExpression -> ": **${theFir.calleeReference.nameIfAvailable.trim('<', '>')}**"
+                theFir is FirTypeOperatorCall ->
+                    ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable.trim('<', '>')}**"
+                theValue != null -> ": $theValue"
+                theKind != null -> ": **${theKind.token}**"
+                theOperation != null -> ": **${theOperation.operator}**"
+                else -> ""
+            }
+        } catch (_: ReflectiveOperationException) { "" }
 
         return "${expandedName.lowercase().trimStart()}${extra.noAngleBrackets}"
     }

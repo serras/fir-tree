@@ -27,9 +27,8 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
 import org.jetbrains.kotlin.KtRealSourceElementKind
 import org.jetbrains.kotlin.KtSourceElement
-import org.jetbrains.kotlin.analysis.low.level.api.fir.LLFirResolveSessionService
-import org.jetbrains.kotlin.analysis.low.level.api.fir.api.getOrBuildFirFile
-import org.jetbrains.kotlin.analysis.project.structure.ProjectStructureProvider
+import org.jetbrains.kotlin.analysis.api.analyze
+import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
@@ -37,7 +36,9 @@ import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
+import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
 import org.jetbrains.kotlin.fir.visitors.FirTransformer
 import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
@@ -55,6 +56,8 @@ import javax.swing.JToolBar
 import javax.swing.event.TreeModelListener
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
+import kotlin.reflect.KProperty1
+import kotlin.reflect.full.memberProperties
 
 class FirToolWindow : ToolWindowFactory, DumbAware {
     private val tree = Tree(EmptyTreeModel).also {
@@ -109,7 +112,7 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             }
 
             override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
-            override fun displayTextInToolbar(): Boolean = true
+            // override fun displayTextInToolbar(): Boolean = true
         }
 
         val cfg = object : AnAction("Control Flow Graph", "Show the Control Flow Graph", AllIcons.Graph.Layout) {
@@ -216,23 +219,26 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
     private fun computeInfo(project: Project, file: VirtualFile): List<FirElement>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
-            val module = ProjectStructureProvider.getModule(project, ktFile, null)
-            val session =
-                project.getService(LLFirResolveSessionService::class.java)
-                    .getFirResolveSessionNoCaching(module)
-            val firFile = ktFile.getOrBuildFirFile(session)
-            val allButDeclarations = computeAllButDeclarations(firFile)
-            val declarations = ktFile.declarations.map {
-                try {
-                    session.resolveToFirSymbol(it, currentResolveChoice).fir
-                } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                    FirProblemElement(it, e)
-                }
+            analyze(ktFile) {
+                val firFile = ktFile.symbol.getFirElement<FirFile>() ?: return null
+                val allButDeclarations = computeAllButDeclarations(firFile)
+                // val declarations = ktFile.declarations.map {
+                //     it.symbol.getFirElement<FirDeclaration>() ?: FirProblemElement(it, null)
+                // }
+                return allButDeclarations + firFile.declarations // declarations
             }
-            return allButDeclarations + declarations
         } catch (_: Throwable) {
             return null
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <E: FirDeclaration> KaSymbol.getFirElement(): E? {
+        val firSymbolProperty = this::class.memberProperties.find { it.name == "firSymbol" } as? KProperty1<KaSymbol, Any> ?: return null
+        val firSymbol = firSymbolProperty.get(this) as FirBasedSymbol<*>
+        firSymbol.lazyResolveToPhaseRecursively(currentResolveChoice)
+        val firProperty = firSymbol::class.memberProperties.find { it.name == "fir" } as? KProperty1<Any, E> ?: return null
+        return firProperty.get(firSymbol)
     }
 
     private fun computeAllButDeclarations(file: FirFile): List<FirElement> = buildList {
@@ -261,12 +267,12 @@ object EmptyTreeModel : TreeModel {
     override fun removeTreeModelListener(l: TreeModelListener?) {}
 }
 
-class FirProblemElement(declaration: KtDeclaration, problem: Throwable) : FirElement {
+class FirProblemElement(declaration: KtDeclaration, problem: Throwable?) : FirElement {
     override val source: KtSourceElement =
         declaration.toKtPsiSourceElement(KtRealSourceElementKind)
 
     val name: String? = declaration.name
-    val message: String? = problem.message
+    val message: String? = problem?.message
 
     @Suppress("EmptyFunctionBlock")
     override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) {
