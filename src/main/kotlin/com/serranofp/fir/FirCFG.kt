@@ -18,7 +18,6 @@ import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ExitNodeMarker
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
-import org.jetbrains.kotlin.fir.types.coneType // needed in 2024.2.1
 import org.jetbrains.kotlin.fir.types.renderReadable
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties

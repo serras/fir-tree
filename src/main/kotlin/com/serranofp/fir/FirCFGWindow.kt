@@ -3,8 +3,8 @@ package com.serranofp.fir
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
-import java.awt.Color
 import java.awt.Dimension
 import javax.swing.Box
 import javax.swing.JButton
@@ -15,7 +15,7 @@ fun controlFlowGraphWindow(name: String?, graph: (String) -> String): JFrame {
     var vertical = true
 
     val browser = JBCefBrowser()
-    browser.component.background = Color.white
+    browser.component.background = JBColor.WHITE
 
     fun loadGraph() {
         val prefix = if (vertical) "TD" else "LR"
@@ -29,13 +29,13 @@ fun controlFlowGraphWindow(name: String?, graph: (String) -> String): JFrame {
             vertical = !vertical
             loadGraph()
         }
-        background = Color.white
+        background = JBColor.WHITE
     }
 
     val frame = JFrame()
     val toolbar = JToolBar().apply {
         isFloatable = false
-        background = Color.white
+        background = JBColor.WHITE
     }
 
     val ui = SimpleToolWindowPanel(true)

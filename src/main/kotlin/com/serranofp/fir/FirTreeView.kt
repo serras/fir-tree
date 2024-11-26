@@ -4,7 +4,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.ui.JBColor
-import com.intellij.ui.components.Label
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirLabel
@@ -32,7 +31,10 @@ import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirAugmentedAssignment
 import org.jetbrains.kotlin.fir.expressions.FirBlock
+import org.jetbrains.kotlin.fir.expressions.FirBooleanOperatorExpression
+import org.jetbrains.kotlin.fir.expressions.FirComparisonExpression
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
+import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.expressions.FirLazyExpression
@@ -132,7 +134,7 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
         val addition = getTreeCellAddition(value)
         val label = "$prefix$name$addition"
         val labelComponent = when (val icon = (value as? FirElement)?.icon) {
-            null -> Label(label)
+            null -> JLabel(label)
             else -> JLabel(label, icon, SwingConstants.LEFT)
         }
         if (value is FirElement && !value.isLazy && value.source == null) {
@@ -218,8 +220,11 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
             is FirStatement -> {
                 val additionalInfo = when (value) {
                     is FirWhenExpression -> "exhaustiveness: ${value.exhaustivenessStatus.shown()}"
+                    is FirBooleanOperatorExpression -> "operator: ${value.kind.name}"
                     is FirAugmentedAssignment -> "operator: ${value.operation.name}"
                     is FirTypeOperatorCall -> "operator: ${value.operation.name}"
+                    is FirComparisonExpression -> "operator: ${value.operation.name}"
+                    is FirEqualityOperatorCall -> "operator: ${value.operation.name}"
                     is FirThisReceiverExpression -> if (value.isImplicit) "implicit" else null
                     is FirLiteralExpression -> "value: ${value.value}"
                     else -> null
@@ -280,9 +285,8 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
 
 fun ExhaustivenessStatus?.shown(): String = when (this) {
     null -> "unknown"
-    ExhaustivenessStatus.ExhaustiveAsNothing -> "ExhaustiveAsNothing"
-    ExhaustivenessStatus.ProperlyExhaustive -> "ProperlyExhaustive"
     is ExhaustivenessStatus.NotExhaustive -> "NotExhaustive"
+    else -> toString()
 }
 
 fun parensList(vararg elements: String?) =

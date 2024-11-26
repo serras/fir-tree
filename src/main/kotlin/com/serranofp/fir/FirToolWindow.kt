@@ -115,6 +115,7 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             // override fun displayTextInToolbar(): Boolean = true
         }
 
+        @Suppress("DialogTitleCapitalization")
         val cfg = object : AnAction("Control Flow Graph", "Show the Control Flow Graph", AllIcons.Graph.Layout) {
             override fun actionPerformed(e: AnActionEvent) {
                 showCfgOfSelectedElement()
