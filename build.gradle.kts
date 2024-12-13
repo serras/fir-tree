@@ -4,7 +4,7 @@ import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.0.21"
-    id("org.jetbrains.intellij.platform") version "2.1.0"
+    id("org.jetbrains.intellij.platform") version "2.2.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
