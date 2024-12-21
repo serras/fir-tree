@@ -1,15 +1,16 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
+import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.0.21"
+    id("org.jetbrains.kotlin.jvm") version "2.1.0"
     id("org.jetbrains.intellij.platform") version "2.2.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "com.serranofp"
-version = "0.4.1"
+version = "0.4.2"
 
 repositories {
     mavenCentral()
@@ -27,7 +28,6 @@ dependencies {
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
-        instrumentationTools()
     }
 }
 
@@ -81,5 +81,11 @@ tasks {
 
     publishPlugin {
         token.set(providers.environmentVariable("PUBLISH_TOKEN"))
+    }
+}
+
+tasks.named<RunIdeTask>("runIde") {
+    jvmArgumentProviders += CommandLineArgumentProvider {
+        listOf("-Didea.kotlin.plugin.use.k2=true")
     }
 }

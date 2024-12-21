@@ -30,7 +30,7 @@ $content
     </pre>
   </center>
   <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
     mermaid.initialize({ startOnLoad: true });
   </script>
   
@@ -50,7 +50,15 @@ val FirTypeRef.nameIfAvailable: String
         else -> "?"
     }
 
-val String.noAngleBrackets: String get() = this.replace("<", "&lt;").replace(">", "&gt;")
+val replacementsForMermaid = listOf(
+    "<" to "#lt;",
+    ">" to "#gt;",
+    "\"" to "#quot;",
+    "\n" to "#bsol;n"
+)
+
+val String.escapedForMermaid: String get() =
+    replacementsForMermaid.fold(this) { acc, (c, x) -> acc.replace(c, x) }
 
 val CFGNode<*>.niceLabel: String
     get() {
@@ -86,7 +94,7 @@ val CFGNode<*>.niceLabel: String
             }
         } catch (_: ReflectiveOperationException) { "" }
 
-        return "${expandedName.lowercase().trimStart()}${extra.noAngleBrackets}"
+        return "${expandedName.lowercase().trimStart()}${extra.escapedForMermaid}"
     }
 
 @Suppress("CyclomaticComplexMethod")
