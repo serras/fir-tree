@@ -97,7 +97,6 @@ class FirTreeModel(private val topLevel: List<FirElement>, internal val editor: 
 
     private fun Any?.toChildren(): List<*> = when (this) {
         is List<*> -> this
-        is FirProblemElement -> listOfNotNull(message)
         is FirElement -> children()
         is FirTreeElement -> value.children()
         else -> emptyList<Any>()
@@ -128,7 +127,6 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
             null -> "?"
             is String -> value
             is List<*> -> "<list>"
-            is FirProblemElement -> "error analyzing ${value.name}"
             else -> value::class.simpleName?.withoutImpl() ?: "?"
         }
         val addition = getTreeCellAddition(value)
@@ -371,7 +369,6 @@ val FirElement.icon: Icon?
             is FirLabel -> AllIcons.Nodes.Tag
             is FirAnnotationContainer -> AllIcons.Gutter.ExtAnnotation
             is FirDeclarationStatus -> AllIcons.Actions.GroupBy
-            is FirProblemElement -> AllIcons.Nodes.ErrorIntroduction
             else -> null
         }
     } catch (_: ReflectiveOperationException) { null }

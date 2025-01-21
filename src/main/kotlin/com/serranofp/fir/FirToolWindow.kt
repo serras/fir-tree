@@ -25,8 +25,6 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
-import org.jetbrains.kotlin.KtRealSourceElementKind
-import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.fir.FirElement
@@ -39,12 +37,8 @@ import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
-import org.jetbrains.kotlin.fir.visitors.FirTransformer
-import org.jetbrains.kotlin.fir.visitors.FirVisitor
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
-import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.toKtPsiSourceElement
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.event.MouseAdapter
@@ -223,9 +217,6 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             analyze(ktFile) {
                 val firFile = ktFile.symbol.getFirElement<FirFile>() ?: return null
                 val allButDeclarations = computeAllButDeclarations(firFile)
-                // val declarations = ktFile.declarations.map {
-                //     it.symbol.getFirElement<FirDeclaration>() ?: FirProblemElement(it, null)
-                // }
                 return allButDeclarations + firFile.declarations // declarations
             }
         } catch (_: Throwable) {
@@ -266,18 +257,4 @@ object EmptyTreeModel : TreeModel {
     override fun valueForPathChanged(path: TreePath?, newValue: Any?) {}
     override fun addTreeModelListener(l: TreeModelListener?) {}
     override fun removeTreeModelListener(l: TreeModelListener?) {}
-}
-
-class FirProblemElement(declaration: KtDeclaration, problem: Throwable?) : FirElement {
-    override val source: KtSourceElement =
-        declaration.toKtPsiSourceElement(KtRealSourceElementKind)
-
-    val name: String? = declaration.name
-    val message: String? = problem?.message
-
-    @Suppress("EmptyFunctionBlock")
-    override fun <R, D> acceptChildren(visitor: FirVisitor<R, D>, data: D) {
-    }
-
-    override fun <D> transformChildren(transformer: FirTransformer<D>, data: D): FirElement = this
 }

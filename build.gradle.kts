@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.4.2"
+version = "0.4.3"
 
 repositories {
     mavenCentral()
@@ -23,8 +23,7 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.7")
 
     intellijPlatform {
-        // intellijIdeaCommunity("243.12818.47")
-        intellijIdeaCommunity("2024.3")
+        intellijIdeaCommunity("2024.3.2")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
