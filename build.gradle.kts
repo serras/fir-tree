@@ -5,7 +5,7 @@ import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
-    id("org.jetbrains.intellij.platform") version "2.2.1"
+    id("org.jetbrains.intellij.platform") version "2.3.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
