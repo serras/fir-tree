@@ -1,16 +1,18 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.20"
-    id("org.jetbrains.intellij.platform") version "2.4.0"
+    id("org.jetbrains.intellij.platform") version "2.5.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
 }
 
 group = "com.serranofp"
-version = "0.4.3"
+version = "0.4.4"
 
 repositories {
     mavenCentral()
@@ -32,7 +34,7 @@ dependencies {
 
 object Supported {
     const val sinceBuild = "243"
-    const val untilBuild = "251.*"
+    const val untilBuild = "252.*"
 }
 
 intellijPlatform {
@@ -58,8 +60,8 @@ tasks {
         targetCompatibility = "21"
     }
 
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
-        compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    withType<KotlinJvmCompile> {
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
         compilerOptions.freeCompilerArgs.add("-Xextended-compiler-checks")
     }
 
@@ -68,8 +70,8 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set("243")
-        untilBuild.set("251.*")
+        sinceBuild.set(Supported.sinceBuild)
+        untilBuild.set(Supported.untilBuild)
     }
 
     signPlugin {
