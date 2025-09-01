@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.0"
+    id("org.jetbrains.kotlin.jvm") version "2.2.10"
     id("org.jetbrains.intellij.platform") version "2.7.2"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
 }
