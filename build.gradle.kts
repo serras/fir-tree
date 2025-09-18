@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.4.5"
+version = "0.4.6"
 
 repositories {
     mavenCentral()
@@ -25,7 +25,8 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     intellijPlatform {
-        intellijIdeaCommunity("2025.2")
+        intellijIdea("253.17525.95")
+        // intellijIdeaCommunity("2025.2")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
@@ -33,7 +34,7 @@ dependencies {
 }
 
 object Supported {
-    const val sinceBuild = "243"
+    const val sinceBuild = "252"
     const val untilBuild = "253.*"
 }
 
@@ -46,7 +47,13 @@ intellijPlatform {
             select {
                 types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
                 channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)
-                sinceBuild = Supported.sinceBuild
+                sinceBuild = "252"
+                untilBuild = "252.*"
+            }
+            select {
+                types = listOf(IntelliJPlatformType.IntellijIdea)
+                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)
+                sinceBuild = "253"
                 untilBuild = Supported.untilBuild
             }
         }

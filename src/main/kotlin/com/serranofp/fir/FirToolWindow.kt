@@ -12,7 +12,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.fileEditor.TextEditor
-import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.SimpleToolWindowPanel
@@ -53,7 +52,7 @@ import javax.swing.tree.TreePath
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties
 
-class FirToolWindow : ToolWindowFactory, DumbAware {
+class FirToolWindow : ToolWindowFactory {
     private val tree = Tree(EmptyTreeModel).also {
         it.cellRenderer = FirCellRenderer(false)
         it.isRootVisible = false

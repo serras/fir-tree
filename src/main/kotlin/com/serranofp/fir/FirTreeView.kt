@@ -267,7 +267,7 @@ fun ConeKotlinType.shownName(useFqNames: Boolean): String =
 fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
     if (useFqNames) {
         when (this) {
-            is FirCallableSymbol<*> -> callableId.asSingleFqName().asString()
+            is FirCallableSymbol<*> -> callableId?.asSingleFqName()?.asString() ?: name.asString()
             is FirClassLikeSymbol<*> -> classId.asSingleFqName().asString()
             is FirTypeParameterSymbol -> name.asString()
             else -> null
