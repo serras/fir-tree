@@ -11,22 +11,32 @@ import javax.swing.JButton
 import javax.swing.JFrame
 import javax.swing.JToolBar
 
-fun controlFlowGraphWindow(name: String?, graph: (String) -> String): JFrame {
+fun controlFlowGraphWindow(name: String?, graph: (String, Boolean) -> String): JFrame {
     var vertical = true
+    var dfaComments = false
 
     val browser = JBCefBrowser()
     browser.component.background = JBColor.WHITE
 
     fun loadGraph() {
         val prefix = if (vertical) "TD" else "LR"
-        val content = mermaidHtml(graph(prefix))
+        val content = mermaidHtml(graph(prefix, dfaComments))
         browser.loadHTML(content)
     }
 
-    val switch = JButton("Switch Direction", AllIcons.Actions.SyncPanels).apply {
+    val switch = JButton("Direction", AllIcons.Actions.SyncPanels).apply {
         toolTipText = "Switch Direction"
         addActionListener {
             vertical = !vertical
+            loadGraph()
+        }
+        background = JBColor.WHITE
+    }
+
+    val dfa = JButton("DFA", AllIcons.Actions.Properties).apply {
+        toolTipText = "Show DFA"
+        addActionListener {
+            dfaComments = !dfaComments
             loadGraph()
         }
         background = JBColor.WHITE
@@ -54,11 +64,13 @@ fun controlFlowGraphWindow(name: String?, graph: (String) -> String): JFrame {
 
     if (SystemInfo.isMac) {
         switch.border = null
+        dfa.border = null
         toolbar.add(@Suppress("MagicNumber") Box.createHorizontalStrut(70), 0)
         frame.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
         frame.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
     }
     toolbar.add(switch)
+    toolbar.add(dfa)
 
     return frame
 }

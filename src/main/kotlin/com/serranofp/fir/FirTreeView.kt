@@ -55,6 +55,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirReceiverParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
@@ -264,22 +265,22 @@ fun String.withoutImpl(): String =
 fun ConeKotlinType.shownName(useFqNames: Boolean): String =
     if (useFqNames) renderReadableWithFqNames() else renderReadable()
 
-fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? =
-    if (useFqNames) {
-        when (this) {
-            is FirCallableSymbol<*> -> callableId?.asSingleFqName()?.asString() ?: name.asString()
-            is FirClassLikeSymbol<*> -> classId.asSingleFqName().asString()
-            is FirTypeParameterSymbol -> name.asString()
-            else -> null
-        }
-    } else {
-        when (this) {
-            is FirCallableSymbol<*> -> name.asString()
-            is FirClassLikeSymbol<*> -> name.asString()
-            is FirTypeParameterSymbol -> name.asString()
-            else -> null
+fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? = when (this) {
+    is FirReceiverParameterSymbol -> {
+        when (val containingSymbolName = containingDeclarationSymbol.shownName(useFqNames)) {
+            null -> "this"
+            else -> "this@$containingSymbolName"
         }
     }
+    is FirCallableSymbol<*> ->
+        if (useFqNames) callableId?.asSingleFqName()?.asString() ?: name.asString()
+        else name.asString()
+    is FirClassLikeSymbol<*> ->
+        if (useFqNames) classId.asSingleFqName().asString()
+        else name.asString()
+    is FirTypeParameterSymbol -> name.asString()
+    else -> null
+}
 
 fun ExhaustivenessStatus?.shown(): String = when (this) {
     null -> "unknown"

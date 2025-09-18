@@ -7,10 +7,13 @@ import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.FirOperation
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
+import org.jetbrains.kotlin.fir.expressions.FirSmartCastExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirThisReference
+import org.jetbrains.kotlin.fir.resolve.dfa.Implication
+import org.jetbrains.kotlin.fir.resolve.dfa.TypeStatement
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNode
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNodeWithSubgraphs
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.EnterNodeMarker
@@ -31,7 +34,7 @@ $content
   </center>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true });
+    mermaid.initialize({ startOnLoad: true, flowchart: { curve: "linear" } });
   </script>
   
 </body> 
@@ -60,63 +63,102 @@ val replacementsForMermaid = listOf(
 val String.escapedForMermaid: String get() =
     replacementsForMermaid.fold(this) { acc, (c, x) -> acc.replace(c, x) }
 
-val CFGNode<*>.niceLabel: String
-    get() {
-        val name = this::class.simpleName ?: "UnknownNode"
-        val expandedName =
-            @Suppress("MagicNumber")
-            name.dropLast(4).replace(Regex("([A-Z])"), " $1")
+fun CFGNode<*>.niceLabel(nodes: Map<CFGNode<*>, Int>, firToNodes: Map<FirElement, Int>, dfa: Boolean): String {
+    val name = this::class.simpleName ?: "UnknownNode"
+    val expandedName =
+        @Suppress("MagicNumber")
+        name.dropLast(4).replace(Regex("([A-Z])"), " $1")
 
-        @Suppress("UNCHECKED_CAST")
-        val valueProperty = fir::class.memberProperties.find { it.name == "value" } as? KProperty1<FirElement, Any?>
-        val theValue = valueProperty?.get(fir)
+    @Suppress("UNCHECKED_CAST")
+    val valueProperty = fir::class.memberProperties.find { it.name == "value" } as? KProperty1<FirElement, Any?>
+    val theValue = valueProperty?.get(fir)
 
-        @Suppress("UNCHECKED_CAST")
-        val kindProperty = fir::class.memberProperties.find { it.name == "kind" } as? KProperty1<FirElement, Any?>
-        val theKind = kindProperty?.get(fir) as? LogicOperationKind
+    @Suppress("UNCHECKED_CAST")
+    val kindProperty = fir::class.memberProperties.find { it.name == "kind" } as? KProperty1<FirElement, Any?>
+    val theKind = kindProperty?.get(fir) as? LogicOperationKind
 
-        @Suppress("UNCHECKED_CAST")
-        val operationProperty = fir::class.memberProperties.find { it.name == "operation" } as? KProperty1<FirElement, Any?>
-        val theOperation = operationProperty?.get(fir) as? FirOperation
+    @Suppress("UNCHECKED_CAST")
+    val operationProperty = fir::class.memberProperties.find { it.name == "operation" } as? KProperty1<FirElement, Any?>
+    val theOperation = operationProperty?.get(fir) as? FirOperation
 
-        val theFir = fir
-        val extra = try {
-            when {
-                theFir is FirVariable -> ": **${theFir.name.asString().trim('<', '>')}**"
-                theFir is FirSimpleFunction -> ": **${theFir.name.asString().trim('<', '>')}**"
-                theFir is FirQualifiedAccessExpression -> ": **${theFir.calleeReference.nameIfAvailable.trim('<', '>')}**"
-                theFir is FirTypeOperatorCall ->
-                    ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable.trim('<', '>')}**"
-                theValue != null -> ": $theValue"
-                theKind != null -> ": **${theKind.token}**"
-                theOperation != null -> ": **${theOperation.operator}**"
-                else -> ""
-            }
-        } catch (_: ReflectiveOperationException) { "" }
+    val typeStatements = allTypeStatements.toMutableSet()
+    val implications = allImplications.toMutableSet()
+    for (node in previousNotDeadOrBack) {
+        typeStatements.removeAll(node.allTypeStatements)
+        implications.removeAll(node.allImplications)
+    }
 
-        return "${expandedName.lowercase().trimStart()}${extra.escapedForMermaid}"
+    val theFir = fir.withoutSmartcast
+    val extra = try {
+        when {
+            theFir is FirVariable -> ": **${theFir.name.asString().escapedForMermaid}**"
+            theFir is FirSimpleFunction -> ": **${theFir.name.asString().escapedForMermaid}**"
+            theFir is FirQualifiedAccessExpression -> ": **${theFir.calleeReference.nameIfAvailable.escapedForMermaid}**"
+            theFir is FirTypeOperatorCall ->
+                ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable.escapedForMermaid}**"
+            theValue != null -> ": $theValue"
+            theKind != null -> ": **${theKind.token}**"
+            theOperation != null -> ": **${theOperation.operator}**"
+            else -> ""
+        }
+    } catch (_: ReflectiveOperationException) { "" }
+
+    val flowInfo = when {
+        !dfa || isDead -> ""
+        typeStatements.isEmpty() && implications.isEmpty() -> ""
+        else -> {
+            val info = typeStatements.map { it.toMermaid(firToNodes) } + implications.map { it.toMermaid(firToNodes) }
+            "<hr> " + info.joinToString("\n\n") { "<small>$it</small>" }
+        }
+    }
+
+    return "<small>(#${nodes[this]})</small>\n\n${expandedName.lowercase().trimStart()}${extra.escapedForMermaid}$flowInfo"
+}
+
+val CFGNode<*>.previousNotDeadOrBack: List<CFGNode<*>>
+    get() = previousNodes.filter { this.edgeFrom(it).kind.let { kind -> !kind.isDead && !kind.isBack } }
+
+val CFGNode<*>.allTypeStatements: Set<TypeStatement>
+    get() = flow.allVariablesForDebug.mapNotNullTo(mutableSetOf()) { flow.getTypeStatement(it) }
+
+val CFGNode<*>.allImplications: Set<Implication>
+    get() = flow.allVariablesForDebug.flatMapTo(mutableSetOf()) { flow.getImplications(it).orEmpty() }
+
+val FirElement.withoutSmartcast: FirElement
+    get() = when (this) {
+        is FirSmartCastExpression -> originalExpression.withoutSmartcast
+        else -> this
     }
 
 @Suppress("CyclomaticComplexMethod")
-fun FirControlFlowGraphOwner.graph(): ((String) -> String)? {
+fun FirControlFlowGraphOwner.graph(): ((String, Boolean) -> String)? {
     var nodeId = 0
     val nodes = mutableMapOf<CFGNode<*>, Int>()
+    val firToNodes = mutableMapOf<FirElement, Int>()
     val cfg = controlFlowGraphReference?.controlFlowGraph ?: return null
 
-    val theActualContent = buildString {
+    // pre-fill all known nodes
+    cfg.nodes.forEach { node ->
+        nodes.getOrPut(node) {
+            nodeId += 1
+            nodeId
+        }
+        firToNodes[node.fir.withoutSmartcast] = nodes[node]!!
+    }
+
+    fun theActualContent(dfa: Boolean) = buildString {
         fun addNode(node: CFGNode<*>) {
             val thisNode = nodes.getOrPut(node) {
                 nodeId += 1
                 nodeId
             }
 
+            val niceLabel = node.niceLabel(nodes, firToNodes, dfa)
             when (node) {
-                is EnterNodeMarker -> appendLine("  node$thisNode[/\"`${node.niceLabel}`\"\\]")
-                is ExitNodeMarker -> appendLine("  node$thisNode[\\\"`${node.niceLabel}`\"/]")
-                else -> when {
-                    node.isUnion -> appendLine("  node$thisNode{{\"`${node.niceLabel}`\"}}")
-                    else -> appendLine("  node$thisNode[\"`${node.niceLabel}`\"]")
-                }
+                is EnterNodeMarker -> appendLine("  node$thisNode[/\"`$niceLabel`\"\\]")
+                is ExitNodeMarker -> appendLine("  node$thisNode[\\\"`$niceLabel`\"/]")
+                else if node.isUnion -> appendLine("  node$thisNode{{\"`$niceLabel`\"}}")
+                else -> appendLine("  node$thisNode[\"`$niceLabel`\"]")
             }
 
             if (node.previousNodes.isEmpty() || node.followingNodes.isEmpty()) {
@@ -171,5 +213,5 @@ fun FirControlFlowGraphOwner.graph(): ((String) -> String)? {
         cfg.nodes.forEach(::addNode)
     }
 
-    return { prefix -> "flowchart $prefix\n$theActualContent" }
+    return { prefix, dfa -> "flowchart $prefix\n${theActualContent(dfa)}" }
 }
