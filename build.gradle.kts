@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.4.4"
+version = "0.4.5"
 
 repositories {
     mavenCentral()
@@ -25,7 +25,7 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     intellijPlatform {
-        intellijIdeaCommunity("2024.3.2")
+        intellijIdeaCommunity("2025.2")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
@@ -34,7 +34,7 @@ dependencies {
 
 object Supported {
     const val sinceBuild = "243"
-    const val untilBuild = "252.*"
+    const val untilBuild = "253.*"
 }
 
 intellijPlatform {
@@ -62,7 +62,6 @@ tasks {
 
     withType<KotlinJvmCompile> {
         compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
-        compilerOptions.freeCompilerArgs.add("-Xextended-compiler-checks")
     }
 
     buildSearchableOptions {

@@ -28,6 +28,7 @@ import org.jetbrains.concurrency.CancellablePromise
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
@@ -35,7 +36,6 @@ import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtFile
@@ -209,13 +209,14 @@ class FirToolWindow : ToolWindowFactory, DumbAware {
             .submit(AppExecutorUtil.getAppExecutorService())
     }
 
+    @OptIn(DirectDeclarationsAccess::class)
     @Suppress("ReturnCount")
-    @OptIn(SymbolInternals::class)
     private fun computeInfo(project: Project, file: VirtualFile): List<FirElement>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
             analyze(ktFile) {
                 val firFile = ktFile.symbol.getFirElement<FirFile>() ?: return null
+                firFile.lazyResolveToPhaseRecursively(currentResolveChoice)
                 val allButDeclarations = computeAllButDeclarations(firFile)
                 return allButDeclarations + firFile.declarations // declarations
             }
