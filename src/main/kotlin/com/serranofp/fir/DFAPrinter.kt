@@ -6,10 +6,13 @@ import org.jetbrains.kotlin.fir.resolve.dfa.DataFlowVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.Implication
 import org.jetbrains.kotlin.fir.resolve.dfa.Operation
 import org.jetbrains.kotlin.fir.resolve.dfa.OperationStatement
+import org.jetbrains.kotlin.fir.resolve.dfa.PersistentFlow
 import org.jetbrains.kotlin.fir.resolve.dfa.RealVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.Statement
 import org.jetbrains.kotlin.fir.resolve.dfa.SyntheticVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.TypeStatement
+import kotlin.reflect.full.functions
+import kotlin.reflect.full.memberProperties
 
 fun DataFlowVariable.toMermaid(firToNodes: Map<FirElement, Int>): String = (when (this) {
     is RealVariable -> symbol.shownName(false)
@@ -39,8 +42,14 @@ fun TypeStatement.toMermaid(firToNodes: Map<FirElement, Int>): String {
             is DfaType.Symbol -> "!= ${it.symbol.shownName(false)}"
         }
     }
-    return "**${variable.toMermaid(firToNodes)}** ${typeInfo.joinToString(" & ")}"
+    return "**${variableThatWorks.toMermaid(firToNodes)}** ${typeInfo.joinToString(" & ")}"
 }
 
 fun Implication.toMermaid(firToNodes: Map<FirElement, Int>): String =
     "${condition.toMermaid(firToNodes)} ⇒ ${effect.toMermaid(firToNodes)}"
+
+fun PersistentFlow.getTypeStatementThatWorks(variable: RealVariable): TypeStatement? =
+    this::class.functions.find { it.name == "getTypeStatement" }?.call(this, variable) as TypeStatement?
+
+val TypeStatement.variableThatWorks: DataFlowVariable
+    get() = this::class.memberProperties.find { it.name == "variable" }!!.call(this) as DataFlowVariable

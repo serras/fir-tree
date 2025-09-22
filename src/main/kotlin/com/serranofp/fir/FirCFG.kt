@@ -1,8 +1,8 @@
 package com.serranofp.fir
 
+import com.intellij.ui.JBColor
 import org.jetbrains.kotlin.contracts.description.LogicOperationKind
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
 import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.FirOperation
@@ -13,12 +13,14 @@ import org.jetbrains.kotlin.fir.references.FirReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirThisReference
 import org.jetbrains.kotlin.fir.resolve.dfa.Implication
+import org.jetbrains.kotlin.fir.resolve.dfa.PersistentFlow
+import org.jetbrains.kotlin.fir.resolve.dfa.RealVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.TypeStatement
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNode
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNodeWithSubgraphs
+import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ControlFlowGraph
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.EnterNodeMarker
 import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ExitNodeMarker
-import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.types.renderReadable
@@ -34,7 +36,11 @@ $content
   </center>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, flowchart: { curve: "linear" } });
+    mermaid.initialize({ 
+      startOnLoad: true, 
+      flowchart: { curve: "linear" }, 
+      "theme": "${if (JBColor.isBright()) "default" else "dark"}" 
+    });
   </script>
   
 </body> 
@@ -118,11 +124,16 @@ fun CFGNode<*>.niceLabel(nodes: Map<CFGNode<*>, Int>, firToNodes: Map<FirElement
 val CFGNode<*>.previousNotDeadOrBack: List<CFGNode<*>>
     get() = previousNodes.filter { this.edgeFrom(it).kind.let { kind -> !kind.isDead && !kind.isBack } }
 
+val CFGNode<*>.flowOrNull: PersistentFlow?
+    get() = try { flow } catch (_: IllegalStateException) { null }
+
 val CFGNode<*>.allTypeStatements: Set<TypeStatement>
-    get() = flow.allVariablesForDebug.mapNotNullTo(mutableSetOf()) { flow.getTypeStatement(it) }
+    get() = flowOrNull?.allVariablesForDebug.orEmpty()
+        .filterIsInstance<RealVariable>().mapNotNullTo(mutableSetOf()) { flowOrNull?.getTypeStatementThatWorks(it) }
 
 val CFGNode<*>.allImplications: Set<Implication>
-    get() = flow.allVariablesForDebug.flatMapTo(mutableSetOf()) { flow.getImplications(it).orEmpty() }
+    get() = flowOrNull?.allVariablesForDebug.orEmpty()
+        .flatMapTo(mutableSetOf()) { flowOrNull?.getImplications(it).orEmpty() }
 
 val FirElement.withoutSmartcast: FirElement
     get() = when (this) {
@@ -131,29 +142,28 @@ val FirElement.withoutSmartcast: FirElement
     }
 
 @Suppress("CyclomaticComplexMethod")
-fun FirControlFlowGraphOwner.graph(): ((String, Boolean) -> String)? {
+fun ControlFlowGraph.graph(): ((String, Boolean) -> String) {
     var nodeId = 0
-    val nodes = mutableMapOf<CFGNode<*>, Int>()
+    val cfgToNodes = mutableMapOf<CFGNode<*>, Int>()
     val firToNodes = mutableMapOf<FirElement, Int>()
-    val cfg = controlFlowGraphReference?.controlFlowGraph ?: return null
 
     // pre-fill all known nodes
-    cfg.nodes.forEach { node ->
-        nodes.getOrPut(node) {
+    nodes.forEach { node ->
+        cfgToNodes.getOrPut(node) {
             nodeId += 1
             nodeId
         }
-        firToNodes[node.fir.withoutSmartcast] = nodes[node]!!
+        firToNodes[node.fir.withoutSmartcast] = cfgToNodes[node]!!
     }
 
     fun theActualContent(dfa: Boolean) = buildString {
         fun addNode(node: CFGNode<*>) {
-            val thisNode = nodes.getOrPut(node) {
+            val thisNode = cfgToNodes.getOrPut(node) {
                 nodeId += 1
                 nodeId
             }
 
-            val niceLabel = node.niceLabel(nodes, firToNodes, dfa)
+            val niceLabel = node.niceLabel(cfgToNodes, firToNodes, dfa)
             when (node) {
                 is EnterNodeMarker -> appendLine("  node$thisNode[/\"`$niceLabel`\"\\]")
                 is ExitNodeMarker -> appendLine("  node$thisNode[\\\"`$niceLabel`\"/]")
@@ -180,7 +190,7 @@ fun FirControlFlowGraphOwner.graph(): ((String, Boolean) -> String)? {
             }
 
             node.previousNodes.forEach { previous ->
-                val previousNode = nodes.getOrPut(previous) {
+                val previousNode = cfgToNodes.getOrPut(previous) {
                     nodeId += 1
                     nodeId
                 }
@@ -210,7 +220,7 @@ fun FirControlFlowGraphOwner.graph(): ((String, Boolean) -> String)? {
             }
         }
 
-        cfg.nodes.forEach(::addNode)
+        nodes.forEach(::addNode)
     }
 
     return { prefix, dfa -> "flowchart $prefix\n${theActualContent(dfa)}" }

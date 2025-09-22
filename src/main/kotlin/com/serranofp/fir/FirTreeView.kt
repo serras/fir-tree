@@ -55,6 +55,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertyAccessorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirReceiverParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
@@ -272,8 +273,16 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? = when (this) {
             else -> "this@$containingSymbolName"
         }
     }
+    is FirPropertyAccessorSymbol -> {
+        val accessorName = when {
+            isGetter -> "getter"
+            isSetter -> "setter"
+            else -> "??"
+        }
+        "${propertySymbol.shownName(useFqNames)} ($accessorName)"
+    }
     is FirCallableSymbol<*> ->
-        if (useFqNames) callableId?.asSingleFqName()?.asString() ?: name.asString()
+        if (useFqNames) callableId.asSingleFqName().asString()
         else name.asString()
     is FirClassLikeSymbol<*> ->
         if (useFqNames) classId.asSingleFqName().asString()

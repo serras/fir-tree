@@ -18,6 +18,7 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.psi.PsiManager
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
@@ -69,11 +70,9 @@ class FirToolWindow : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         fun showCfgOfSelectedElement() {
             val lastComponent = tree.lastSelectedPathComponent
-            val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement)
-            val selectedCfg = selected as? FirControlFlowGraphOwner ?: return
-            val graph = selectedCfg.graph() ?: return
-            val frame = controlFlowGraphWindow((selected as? FirDeclaration)?.symbol?.shownName(true), graph)
-            frame.isVisible = true
+            val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement) ?: return
+            val window = ToolWindowManager.getInstance(project).getToolWindow("CFG")
+            window?.addTabForCFG(selected)
         }
 
         fun refreshWindowContents() {

@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.4.7"
+version = "0.4.9"
 
 repositories {
     mavenCentral()
@@ -25,8 +25,8 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     intellijPlatform {
-        intellijIdea("253.17525.95")
-        // intellijIdeaCommunity("2025.2")
+        // intellijIdea("253.20558.43")
+        intellijIdeaCommunity("2025.2")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
@@ -43,7 +43,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            recommended()
+            // recommended()
             select {
                 types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
                 channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)

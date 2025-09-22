@@ -9,7 +9,18 @@
     <depends>org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.serranofp.fir.FirToolWindow" id="FIR Tree" icon="/icons/fir.svg" />
+        <toolWindow
+                factoryClass="com.serranofp.fir.FirToolWindow"
+                id="FIR Tree"
+                icon="/icons/fir.svg"
+                anchor="left" />
+        <toolWindow
+                factoryClass="com.serranofp.fir.FirCFGToolWindow"
+                id="CFG"
+                icon="/icons/fir.svg"
+                anchor="right"
+                canCloseContents="true"
+                doNotActivateOnStart="true" />
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">

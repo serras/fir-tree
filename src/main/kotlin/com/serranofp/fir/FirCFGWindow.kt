@@ -1,17 +1,40 @@
 package com.serranofp.fir
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
-import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.wm.ToolWindow
+import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.JBColor
+import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefBrowser
-import java.awt.Dimension
-import javax.swing.Box
+import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
+import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
 import javax.swing.JButton
-import javax.swing.JFrame
 import javax.swing.JToolBar
 
-fun controlFlowGraphWindow(name: String?, graph: (String, Boolean) -> String): JFrame {
+class FirCFGToolWindow : ToolWindowFactory {
+    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+
+    }
+}
+
+fun ToolWindow.addTabForCFG(element: FirElement) {
+    val selectedCfg = element as? FirControlFlowGraphOwner ?: return
+    val graph = selectedCfg.controlFlowGraphReference?.controlFlowGraph ?: return
+    val name = (element as? FirDeclaration)?.symbol?.shownName(true) ?: "??"
+
+    val ui = controlFlowGraphWindow(graph.graph())
+    val content = ContentFactory.getInstance().createContent(ui, name, false)
+    contentManager.addContent(content)
+    contentManager.setSelectedContent(content, true)
+    activate(null)
+}
+
+fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindowPanel {
     var vertical = true
     var dfaComments = false
 
@@ -24,53 +47,37 @@ fun controlFlowGraphWindow(name: String?, graph: (String, Boolean) -> String): J
         browser.loadHTML(content)
     }
 
-    val switch = JButton("Direction", AllIcons.Actions.SyncPanels).apply {
+    val switch = JButton("Switch Direction", AllIcons.Actions.SyncPanels).apply {
         toolTipText = "Switch Direction"
+        border = null
         addActionListener {
             vertical = !vertical
             loadGraph()
         }
-        background = JBColor.WHITE
     }
 
-    val dfa = JButton("DFA", AllIcons.Actions.Properties).apply {
-        toolTipText = "Show DFA"
+    val dfa = JBCheckBox("DFA", dfaComments).apply {
+        toolTipText = "Show data flow analysis information"
         addActionListener {
-            dfaComments = !dfaComments
+            dfaComments = isSelected
             loadGraph()
         }
-        background = JBColor.WHITE
     }
 
-    val frame = JFrame()
     val toolbar = JToolBar().apply {
         isFloatable = false
-        background = JBColor.WHITE
     }
 
     val ui = SimpleToolWindowPanel(true)
     ui.toolbar = toolbar
     ui.setContent(browser.component)
-    frame.contentPane = ui
-    frame.size =
-        @Suppress("MagicNumber")
-        Dimension(800, 800)
-    frame.title = when (name) {
-        null -> "Control Flow Graph"
-        else -> "Control Flow Graph of '$name'"
-    }
 
     loadGraph()
 
-    if (SystemInfo.isMac) {
-        switch.border = null
-        dfa.border = null
-        toolbar.add(@Suppress("MagicNumber") Box.createHorizontalStrut(70), 0)
-        frame.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-        frame.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-    }
     toolbar.add(switch)
     toolbar.add(dfa)
 
-    return frame
+    browser.component.requestFocusInWindow()
+
+    return ui
 }
