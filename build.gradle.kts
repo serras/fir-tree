@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.serranofp"
-version = "0.4.9"
+version = "0.4.10"
 
 repositories {
     mavenCentral()
@@ -26,7 +26,7 @@ dependencies {
 
     intellijPlatform {
         // intellijIdea("253.20558.43")
-        intellijIdeaCommunity("2025.2")
+        intellijIdeaCommunity("2025.2.4")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
@@ -35,7 +35,6 @@ dependencies {
 
 object Supported {
     const val sinceBuild = "252"
-    const val untilBuild = "253.*"
 }
 
 intellijPlatform {
@@ -54,7 +53,7 @@ intellijPlatform {
                 types = listOf(IntelliJPlatformType.IntellijIdea)
                 channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)
                 sinceBuild = "253"
-                untilBuild = Supported.untilBuild
+                untilBuild = provider { null }
             }
         }
     }
@@ -77,7 +76,7 @@ tasks {
 
     patchPluginXml {
         sinceBuild.set(Supported.sinceBuild)
-        untilBuild.set(Supported.untilBuild)
+        untilBuild.set(provider { null })
     }
 
     signPlugin {
