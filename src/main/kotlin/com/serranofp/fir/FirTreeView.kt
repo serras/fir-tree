@@ -47,6 +47,7 @@ import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
 import org.jetbrains.kotlin.fir.expressions.FirWhenExpression
+import org.jetbrains.kotlin.fir.expressions.UnresolvedExpressionTypeAccess
 import org.jetbrains.kotlin.fir.references.FirControlFlowGraphReference
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirNamedReference
@@ -63,10 +64,8 @@ import org.jetbrains.kotlin.fir.types.FirErrorTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeProjection
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.types.coneTypeOrNull
-import org.jetbrains.kotlin.fir.types.isResolved
 import org.jetbrains.kotlin.fir.types.renderReadable
 import org.jetbrains.kotlin.fir.types.renderReadableWithFqNames
-import org.jetbrains.kotlin.fir.types.resolvedType
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.idea.KotlinIcons
 import java.awt.Component
@@ -229,9 +228,10 @@ class FirCellRenderer(private val useFqNames: Boolean = true) : TreeCellRenderer
                     is FirLiteralExpression -> "value: ${value.value}"
                     else -> null
                 }
-                val typeInfo = when (value is FirExpression && !value.isLazy && value.isResolved) {
-                    false -> null
-                    true -> "type: ${value.resolvedType.shownName(useFqNames)}"
+                @OptIn(UnresolvedExpressionTypeAccess::class)
+                val typeInfo = when (value) {
+                    is FirExpression if !value.isLazy -> value.coneTypeOrNull?.let { "type: ${it.shownName(useFqNames)}" }
+                    else -> null
                 }
                 parensList(additionalInfo, typeInfo)
             }
@@ -281,8 +281,8 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? = when (this) {
         }
         "${propertySymbol.shownName(useFqNames)} ($accessorName)"
     }
-    is FirCallableSymbol<*> ->
-        if (useFqNames) callableId.asSingleFqName().asString()
+    is FirCallableSymbol<*> if callableId != null ->
+        if (useFqNames) callableId!!.asSingleFqName().asString()
         else name.asString()
     is FirClassLikeSymbol<*> ->
         if (useFqNames) classId.asSingleFqName().asString()

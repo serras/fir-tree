@@ -3,8 +3,6 @@ package com.serranofp.fir
 import com.intellij.ui.JBColor
 import org.jetbrains.kotlin.contracts.description.LogicOperationKind
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.FirVariable
 import org.jetbrains.kotlin.fir.expressions.FirOperation
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.FirSmartCastExpression
@@ -76,6 +74,10 @@ fun CFGNode<*>.niceLabel(nodes: Map<CFGNode<*>, Int>, firToNodes: Map<FirElement
         name.dropLast(4).replace(Regex("([A-Z])"), " $1")
 
     @Suppress("UNCHECKED_CAST")
+    val nameProperty = fir::class.memberProperties.find { it.name == "name" } as? KProperty1<FirElement, Any?>
+    val theName = nameProperty?.get(fir) as? String
+
+    @Suppress("UNCHECKED_CAST")
     val valueProperty = fir::class.memberProperties.find { it.name == "value" } as? KProperty1<FirElement, Any?>
     val theValue = valueProperty?.get(fir)
 
@@ -97,12 +99,11 @@ fun CFGNode<*>.niceLabel(nodes: Map<CFGNode<*>, Int>, firToNodes: Map<FirElement
     val theFir = fir.withoutSmartcast
     val extra = try {
         when {
-            theFir is FirVariable -> ": **${theFir.name.asString().escapedForMermaid}**"
-            theFir is FirSimpleFunction -> ": **${theFir.name.asString().escapedForMermaid}**"
             theFir is FirQualifiedAccessExpression -> ": **${theFir.calleeReference.nameIfAvailable.escapedForMermaid}**"
             theFir is FirTypeOperatorCall ->
                 ": **${theFir.operation.operator} ${theFir.conversionTypeRef.nameIfAvailable.escapedForMermaid}**"
-            theValue != null -> ": $theValue"
+            theName != null -> ": **${theName.escapedForMermaid}**"
+            theValue != null -> ": ${theValue.toString().escapedForMermaid}"
             theKind != null -> ": **${theKind.token}**"
             theOperation != null -> ": **${theOperation.operator}**"
             else -> ""

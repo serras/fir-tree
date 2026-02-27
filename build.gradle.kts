@@ -1,18 +1,16 @@
-import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
-import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.3.0"
+    id("org.jetbrains.kotlin.jvm") version "2.3.10"
     id("org.jetbrains.intellij.platform") version "2.11.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
 }
 
 group = "com.serranofp"
-version = "0.4.10"
+version = "0.4.11"
 
 repositories {
     mavenCentral()
@@ -25,16 +23,11 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     intellijPlatform {
-        // intellijIdea("253.20558.43")
-        intellijIdeaCommunity("2025.2.4")
+        intellijIdea("2025.3.3")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
     }
-}
-
-object Supported {
-    const val sinceBuild = "252"
 }
 
 intellijPlatform {
@@ -42,19 +35,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            // recommended()
-            select {
-                types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
-                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)
-                sinceBuild = "252"
-                untilBuild = "252.*"
-            }
-            select {
-                types = listOf(IntelliJPlatformType.IntellijIdea)
-                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.RC, ProductRelease.Channel.EAP)
-                sinceBuild = "253"
-                untilBuild = provider { null }
-            }
+            recommended()
         }
     }
 }
@@ -75,7 +56,7 @@ tasks {
     }
 
     patchPluginXml {
-        sinceBuild.set(Supported.sinceBuild)
+        sinceBuild.set("253")
         untilBuild.set(provider { null })
     }
 
