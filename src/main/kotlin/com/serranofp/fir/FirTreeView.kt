@@ -32,6 +32,8 @@ import org.jetbrains.kotlin.fir.expressions.FirArgumentList
 import org.jetbrains.kotlin.fir.expressions.FirAugmentedAssignment
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirBooleanOperatorExpression
+import org.jetbrains.kotlin.fir.expressions.FirCall
+import org.jetbrains.kotlin.fir.expressions.FirCatch
 import org.jetbrains.kotlin.fir.expressions.FirComparisonExpression
 import org.jetbrains.kotlin.fir.expressions.FirDelegatedConstructorCall
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall
@@ -43,6 +45,7 @@ import org.jetbrains.kotlin.fir.expressions.FirLoop
 import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression
+import org.jetbrains.kotlin.fir.expressions.FirTryExpression
 import org.jetbrains.kotlin.fir.expressions.FirTypeOperatorCall
 import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment
 import org.jetbrains.kotlin.fir.expressions.FirWhenBranch
@@ -56,6 +59,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirCallableSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirFileSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertyAccessorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirReceiverParameterSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirTypeParameterSymbol
@@ -288,6 +292,7 @@ fun FirBasedSymbol<*>.shownName(useFqNames: Boolean): String? = when (this) {
         if (useFqNames) classId.asSingleFqName().asString()
         else name.asString()
     is FirTypeParameterSymbol -> name.asString()
+    is FirFileSymbol -> sourceFile?.name
     else -> null
 }
 
@@ -310,7 +315,7 @@ fun FirElement.children(): List<FirTreeElement> = when (this) {
 }
 
 fun FirPureAbstractElement.children(): List<FirTreeElement> =
-    ReadAction.compute<_, Throwable> {
+    ReadAction.computeBlocking<_, Throwable> {
         @Suppress("UNCHECKED_CAST")
         val properties: List<KProperty1<FirPureAbstractElement, *>> =
             this::class.memberProperties.toList() as List<KProperty1<FirPureAbstractElement, *>>
@@ -365,10 +370,13 @@ val FirElement.icon: Icon?
             is FirVariableAssignment -> AllIcons.Vcs.Equal
             is FirDelegatedConstructorCall -> AllIcons.Actions.Forward
             is FirLoop -> AllIcons.Gutter.RecursiveMethod
+            is FirTryExpression -> AllIcons.Debugger.Db_exception_breakpoint
+            is FirCatch -> AllIcons.Debugger.Db_method_breakpoint
             is FirWhenExpression -> AllIcons.Vcs.Merge
             is FirBlock -> AllIcons.FileTypes.Json
             is FirWhenBranch -> AllIcons.Vcs.CommitNode
             is FirAnnotationCall -> AllIcons.Gutter.ExtAnnotation
+            is FirCall -> AllIcons.Debugger.Db_disabled_method_breakpoint
             is FirExpression -> AllIcons.Debugger.Value
             is FirStatement -> AllIcons.Debugger.Db_muted_disabled_method_breakpoint
             is FirTypeProjection -> AllIcons.Nodes.Type

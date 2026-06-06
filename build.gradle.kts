@@ -4,13 +4,13 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.3.21"
+    id("org.jetbrains.kotlin.jvm") version "2.4.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
 }
 
 group = "com.serranofp"
-version = "0.4.11"
+version = "0.4.12"
 
 repositories {
     mavenCentral()
@@ -23,7 +23,7 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
 
     intellijPlatform {
-        intellijIdea("2025.3.5")
+        intellijIdea("2026.1.3")
         bundledPlugin("com.intellij.java")
         bundledPlugin("org.jetbrains.kotlin")
         pluginVerifier()
