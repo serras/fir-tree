@@ -315,7 +315,7 @@ fun FirElement.children(): List<FirTreeElement> = when (this) {
 }
 
 fun FirPureAbstractElement.children(): List<FirTreeElement> =
-    ReadAction.computeBlocking<_, Throwable> {
+    ReadAction.compute<_, Throwable> {
         @Suppress("UNCHECKED_CAST")
         val properties: List<KProperty1<FirPureAbstractElement, *>> =
             this::class.memberProperties.toList() as List<KProperty1<FirPureAbstractElement, *>>
