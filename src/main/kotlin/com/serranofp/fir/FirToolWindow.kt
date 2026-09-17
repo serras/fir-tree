@@ -67,6 +67,8 @@ class FirToolWindow : ToolWindowFactory {
     private val currentResolveChoice: FirResolvePhase
         get() = choices.selectedItem as FirResolvePhase
 
+    override fun isDumbAware(): Boolean = false
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         fun showCfgOfSelectedElement() {
             val lastComponent = tree.lastSelectedPathComponent

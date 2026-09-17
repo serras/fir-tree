@@ -17,6 +17,8 @@ import javax.swing.JButton
 import javax.swing.JToolBar
 
 class FirCFGToolWindow : ToolWindowFactory {
+    override fun isDumbAware(): Boolean = false
+
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
 
     }
