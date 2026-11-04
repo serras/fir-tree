@@ -3,8 +3,8 @@ package com.serranofp.fir
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
-import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.wm.ToolWindow
@@ -37,7 +37,7 @@ class FirCFGToolWindow : ToolWindowFactory {
     }
 }
 
-fun ToolWindow.addTabForCFG(element: FirElement, editorFromTree: TextEditor? = null) {
+fun ToolWindow.addTabForCFG(element: FirElement, editorFromTree: Editor? = null) {
     val selectedCfg = element as? FirControlFlowGraphOwner ?: return
     val controlFlowGraph = selectedCfg.controlFlowGraphReference?.controlFlowGraph ?: return
     val name = (element as? FirDeclaration)?.symbol?.shownName(true) ?: "??"
@@ -49,7 +49,7 @@ fun ToolWindow.addTabForCFG(element: FirElement, editorFromTree: TextEditor? = n
     activate(null)
 }
 
-fun controlFlowGraphWindow(controlFlowGraph: ControlFlowGraph, editor: TextEditor?): SimpleToolWindowPanel {
+fun controlFlowGraphWindow(controlFlowGraph: ControlFlowGraph, editor: Editor?): SimpleToolWindowPanel {
     var vertical = true
     var dfaComments = false
     var loaded = false
@@ -132,12 +132,11 @@ fun controlFlowGraphWindow(controlFlowGraph: ControlFlowGraph, editor: TextEdito
             firElement.source
         }).finishOnUiThread(ModalityState.nonModal()) { source ->
             if (source == null) return@finishOnUiThread
-            val textEditor = editor ?: return@finishOnUiThread
-            val ideEditor = textEditor.editor
-            if (ideEditor.isDisposed) return@finishOnUiThread
-            ideEditor.caretModel.moveToOffset(source.startOffset)
-            ideEditor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
-            ideEditor.selectionModel.setSelection(source.startOffset, source.endOffset)
+            if (editor == null) return@finishOnUiThread
+            if (editor.isDisposed) return@finishOnUiThread
+            editor.caretModel.moveToOffset(source.startOffset)
+            editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
+            editor.selectionModel.setSelection(source.startOffset, source.endOffset)
         }.submit(AppExecutorUtil.getAppExecutorService())
         null
     }

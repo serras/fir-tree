@@ -2,7 +2,7 @@ package com.serranofp.fir
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.editor.Editor
 import com.intellij.ui.JBColor
 import org.jetbrains.kotlin.fir.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.FirElement
@@ -99,7 +99,7 @@ data class FirTreeElement(
 }
 
 @Suppress("EmptyFunctionBlock")
-class FirTreeModel(private val topLevel: List<FirElement>, internal val editor: TextEditor) : TreeModel {
+class FirTreeModel(private val topLevel: List<FirElement>, internal val editor: Editor) : TreeModel {
     override fun getRoot(): Any = topLevel
 
     private fun Any?.toChildren(): List<*> = when (this) {

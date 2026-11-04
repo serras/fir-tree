@@ -18,10 +18,16 @@
         <toolWindow
                 factoryClass="com.serranofp.fir.FirCFGToolWindow"
                 id="CFG"
-                icon="/icons/fir.svg"
+                icon="/icons/cfg.svg"
                 anchor="right"
                 canCloseContents="true"
                 doNotActivateOnStart="true" />
+    </extensions>
+
+
+    <extensions defaultExtensionNs="com.intellij">
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementation="com.serranofp.fir.FirCfgCodeVisionProvider" />
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">

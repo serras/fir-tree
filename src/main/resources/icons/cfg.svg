@@ -1,0 +1,25 @@
+<!-- CFG (Control Flow Graph) icon -->
+<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+    <g>
+        <!-- Node 1 (top) -->
+        <rect x="4" y="0.5" width="8" height="4" rx="1.5" fill="#4A90D9"/>
+        <!-- Edge from node 1 to node 2 (left branch) -->
+        <path d="M7 4.5 L4 6.5" stroke="#4A90D9" stroke-width="1.2" fill="none"/>
+        <polygon points="3.5,6.3 4.5,6.3 4,7.3" fill="#4A90D9"/>
+        <!-- Edge from node 1 to node 3 (right branch) -->
+        <path d="M9 4.5 L12 6.5" stroke="#4A90D9" stroke-width="1.2" fill="none"/>
+        <polygon points="11.5,6.3 12.5,6.3 12,7.3" fill="#4A90D9"/>
+        <!-- Node 2 (middle left) -->
+        <rect x="0.5" y="7.5" width="6" height="4" rx="1.5" fill="#5BA3E6"/>
+        <!-- Node 3 (middle right) -->
+        <rect x="9.5" y="7.5" width="6" height="4" rx="1.5" fill="#5BA3E6"/>
+        <!-- Edge from node 2 to node 4 -->
+        <path d="M4.5 11.5 L6 13.5" stroke="#4A90D9" stroke-width="1.2" fill="none"/>
+        <polygon points="5.5,13.3 6.5,13.3 6,14.3" fill="#4A90D9"/>
+        <!-- Edge from node 3 to node 4 -->
+        <path d="M11.5 11.5 L10 13.5" stroke="#4A90D9" stroke-width="1.2" fill="none"/>
+        <polygon points="9.5,13.3 10.5,13.3 10,14.3" fill="#4A90D9"/>
+        <!-- Node 4 (bottom) -->
+        <rect x="4" y="14" width="8" height="2" rx="1" fill="#3A7BC8"/>
+    </g>
+</svg>

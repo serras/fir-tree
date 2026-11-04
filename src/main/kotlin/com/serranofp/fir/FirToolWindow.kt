@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
@@ -26,16 +27,10 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.concurrency.CancellablePromise
 import org.jetbrains.kotlin.analysis.api.analyze
-import org.jetbrains.kotlin.analysis.api.symbols.KaSymbol
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
-import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.declarations.FirResolvePhase
+import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.expressions.FirLazyBlock
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
-import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.lazyResolveToPhaseRecursively
 import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.psi.KtFile
@@ -50,8 +45,6 @@ import javax.swing.JToolBar
 import javax.swing.event.TreeModelListener
 import javax.swing.tree.TreeModel
 import javax.swing.tree.TreePath
-import kotlin.reflect.KProperty1
-import kotlin.reflect.full.memberProperties
 
 class FirToolWindow : ToolWindowFactory {
     private val tree = Tree(EmptyTreeModel).also {
@@ -62,7 +55,7 @@ class FirToolWindow : ToolWindowFactory {
         FirResolvePhase.entries.toTypedArray()
     )
     private var inProgressAction: CancellablePromise<*>? = null
-    private var status: Pair<VirtualFile, TextEditor>? = null
+    private var status: Pair<VirtualFile, Editor>? = null
 
     private val currentResolveChoice: FirResolvePhase
         get() = choices.selectedItem as FirResolvePhase
@@ -157,7 +150,7 @@ class FirToolWindow : ToolWindowFactory {
             val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement)
             val source = selected?.takeIf { it !is FirLazyBlock }?.source
             if (model == null || source == null) return@addTreeSelectionListener
-            val editor = model.editor.editor
+            val editor = model.editor
             if (editor.isDisposed) return@addTreeSelectionListener
             editor.caretModel.moveToOffset(source.startOffset)
             editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
@@ -185,7 +178,7 @@ class FirToolWindow : ToolWindowFactory {
 
                     override fun selectionChanged(event: FileEditorManagerEvent) {
                         inProgressAction?.cancel()
-                        val newTextEditor = event.newEditor as? TextEditor
+                        val newTextEditor = (event.newEditor as? TextEditor)?.editor
                         if (event.newFile == null || newTextEditor == null) {
                             status = null
                             tree.model = EmptyTreeModel
@@ -198,7 +191,7 @@ class FirToolWindow : ToolWindowFactory {
             )
     }
 
-    private fun refresh(project: Project, file: VirtualFile, editor: TextEditor) {
+    private fun refresh(project: Project, file: VirtualFile, editor: Editor) {
         inProgressAction = ReadAction
             .nonBlocking(Callable { computeInfo(project, file) })
             .inSmartMode(project)
@@ -216,24 +209,16 @@ class FirToolWindow : ToolWindowFactory {
     private fun computeInfo(project: Project, file: VirtualFile): List<FirElement>? {
         try {
             val ktFile = PsiManager.getInstance(project).findFile(file) as? KtFile ?: return null
-            analyze(ktFile) {
-                val firFile = ktFile.symbol.getFirElement<FirFile>() ?: return null
+            val result = analyze(ktFile) {
+                val firFile = ktFile.symbol.getFirElement<FirFile>(currentResolveChoice) ?: return@analyze null
                 firFile.lazyResolveToPhaseRecursively(currentResolveChoice)
                 val allButDeclarations = computeAllButDeclarations(firFile)
-                return allButDeclarations + firFile.declarations // declarations
+                allButDeclarations + firFile.declarations // declarations
             }
+            return result
         } catch (_: Throwable) {
             return null
         }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun <E: FirDeclaration> KaSymbol.getFirElement(): E? {
-        val firSymbolProperty = this::class.memberProperties.find { it.name == "firSymbol" } as? KProperty1<KaSymbol, Any> ?: return null
-        val firSymbol = firSymbolProperty.get(this) as FirBasedSymbol<*>
-        firSymbol.lazyResolveToPhaseRecursively(currentResolveChoice)
-        val firProperty = firSymbol::class.memberProperties.find { it.name == "fir" } as? KProperty1<Any, E> ?: return null
-        return firProperty.get(firSymbol)
     }
 
     private fun computeAllButDeclarations(file: FirFile): List<FirElement> = buildList {
