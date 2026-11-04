@@ -1,7 +1,9 @@
 package com.serranofp.fir
 
+import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.fir.DfaType
 import org.jetbrains.kotlin.fir.FirElement
+import org.jetbrains.kotlin.fir.analysis.checkers.classKind
 import org.jetbrains.kotlin.fir.resolve.dfa.DataFlowVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.Implication
 import org.jetbrains.kotlin.fir.resolve.dfa.Operation
@@ -11,6 +13,7 @@ import org.jetbrains.kotlin.fir.resolve.dfa.RealVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.Statement
 import org.jetbrains.kotlin.fir.resolve.dfa.SyntheticVariable
 import org.jetbrains.kotlin.fir.resolve.dfa.TypeStatement
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
 import kotlin.reflect.full.functions
 import kotlin.reflect.full.memberProperties
 
@@ -39,7 +42,17 @@ fun TypeStatement.toMermaid(firToNodes: Map<FirElement, Int>): String {
         when (it) {
             is DfaType.BooleanLiteral -> "!= ${it.value}"
             is DfaType.Cone -> "!is ${it.type.shownName(false)}"
-            is DfaType.Symbol -> "!= ${it.symbol.shownName(false)}"
+            is DfaType.Symbol -> {
+                val classLikeSymbol = (it.symbol as? FirClassLikeSymbol<*>)?.takeIf {
+                    val kind = it.classKind ?: return@takeIf false
+                    kind != ClassKind.ENUM_ENTRY && kind != ClassKind.OBJECT
+                }
+                when (classLikeSymbol) {
+                    null -> "!= ${it.symbol.shownName(false)}"
+                    else -> "!is ${classLikeSymbol.shownName(false)}"
+                }
+
+            }
         }
     }
     return "**${variableThatWorks.toMermaid(firToNodes)}** ${typeInfo.joinToString(" & ")}"

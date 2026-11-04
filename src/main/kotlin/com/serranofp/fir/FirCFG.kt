@@ -103,7 +103,6 @@ $content
       .then(({ svg }) => {
         root.innerHTML = svg;
         window.__cfgFit();
-        attachClickHandlers();
       })
       .catch((err) => {
         root.innerHTML = '<pre>' + String(err) + '</pre>';
