@@ -157,9 +157,11 @@ class FirToolWindow : ToolWindowFactory {
             val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement)
             val source = selected?.takeIf { it !is FirLazyBlock }?.source
             if (model == null || source == null) return@addTreeSelectionListener
-            model.editor.editor.caretModel.moveToOffset(source.startOffset)
-            model.editor.editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
-            model.editor.editor.selectionModel.setSelection(source.startOffset, source.endOffset)
+            val editor = model.editor.editor
+            if (editor.isDisposed) return@addTreeSelectionListener
+            editor.caretModel.moveToOffset(source.startOffset)
+            editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
+            editor.selectionModel.setSelection(source.startOffset, source.endOffset)
         }
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent?) {
