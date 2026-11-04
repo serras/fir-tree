@@ -26,22 +26,83 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties
 
 fun mermaidHtml(content: String) = """
+<html>
+<head>
+<style>
+  html, body { margin: 0; overflow: auto; }
+  #zoomRoot { width: max-content; margin: 0 auto; }
+</style>
+</head>
 <body>
-  <center>
-    <pre class="mermaid" id="graph">
+<div id="zoomRoot">
+  <pre class="mermaid" id="graph">
 $content
-    </pre>
-  </center>
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ 
-      startOnLoad: true, 
-      flowchart: { curve: "linear" }, 
-      "theme": "${if (JBColor.isBright()) "default" else "dark"}" 
-    });
-  </script>
-  
-</body> 
+  </pre>
+</div>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    flowchart: { curve: "linear", useMaxWidth: false },
+    theme: "${if (JBColor.isBright()) "redux-color" else "redux-dark-color"}",
+    look: "neo",
+    fontFamily: "JetBrains Mono, Trebuchet MS, Verdana, Arial"
+  });
+
+  let zoom = 1;
+  const MIN = 0.2, MAX = 3.0, STEP = 1.2, WHEEL_STEP = 1.1;
+  const root = document.getElementById('zoomRoot');
+
+  function applyZoom() { root.style.zoom = zoom; }
+  function setZoom(z) {
+    zoom = Math.min(MAX, Math.max(MIN, z));
+    applyZoom();
+    if (typeof window.__cfgOnZoomChange === 'function') {
+      window.__cfgOnZoomChange(Math.round(zoom * 100));
+    }
+  }
+
+  window.__cfgZoomIn = () => setZoom(zoom * STEP);
+  window.__cfgZoomOut = () => setZoom(zoom / STEP);
+  window.__cfgZoomReset = () => setZoom(1);
+  window.__cfgSetZoom = (z) => setZoom(z);
+  window.__cfgGetZoom = () => Math.round(zoom * 100);
+
+  window.__cfgFit = () => {
+    const rect = root.getBoundingClientRect();
+    const naturalWidth = rect.width / zoom;
+    const fit = Math.min(1, window.innerWidth / naturalWidth);
+    setZoom(fit);
+  };
+
+  window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      setZoom(zoom * (e.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP));
+    }
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey) {
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(zoom * STEP); }
+      else if (e.key === '-') { e.preventDefault(); setZoom(zoom / STEP); }
+      else if (e.key === '0') { e.preventDefault(); setZoom(1); }
+    }
+  });
+
+  window.__cfgUpdate = (def) => {
+    mermaid.render('cfgSvg', def)
+      .then(({ svg }) => {
+        root.innerHTML = svg;
+        window.__cfgFit();
+      })
+      .catch((err) => {
+        root.innerHTML = '<pre>' + String(err) + '</pre>';
+      });
+  };
+</script>
+</body>
+</html>
 """
 
 val FirReference.nameIfAvailable: String

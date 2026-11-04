@@ -6,6 +6,7 @@
     <description>Visualize the FIR (Frontend Intermediate Representation) and CFG (Control Flow Graph) from a Kotlin file</description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.jcef</depends>
     <depends>org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="com.intellij">
