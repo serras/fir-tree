@@ -24,7 +24,6 @@
                 doNotActivateOnStart="true" />
     </extensions>
 
-
     <extensions defaultExtensionNs="com.intellij">
         <codeInsight.daemonBoundCodeVisionProvider
                 implementation="com.serranofp.fir.FirCfgCodeVisionProvider" />
