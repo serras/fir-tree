@@ -1,6 +1,10 @@
 package com.serranofp.fir
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.wm.ToolWindow
@@ -11,10 +15,15 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
+import com.intellij.util.concurrency.AppExecutorUtil
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirControlFlowGraphOwner
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
+import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNode
+import org.jetbrains.kotlin.fir.resolve.dfa.cfg.CFGNodeWithSubgraphs
+import org.jetbrains.kotlin.fir.resolve.dfa.cfg.ControlFlowGraph
 import org.jetbrains.kotlin.fir.resolve.dfa.controlFlowGraph
+import java.util.concurrent.Callable
 import javax.swing.Box
 import javax.swing.JButton
 import javax.swing.JLabel
@@ -28,22 +37,28 @@ class FirCFGToolWindow : ToolWindowFactory {
     }
 }
 
-fun ToolWindow.addTabForCFG(element: FirElement) {
+fun ToolWindow.addTabForCFG(element: FirElement, editorFromTree: TextEditor? = null) {
     val selectedCfg = element as? FirControlFlowGraphOwner ?: return
-    val graph = selectedCfg.controlFlowGraphReference?.controlFlowGraph ?: return
+    val controlFlowGraph = selectedCfg.controlFlowGraphReference?.controlFlowGraph ?: return
     val name = (element as? FirDeclaration)?.symbol?.shownName(true) ?: "??"
 
-    val ui = controlFlowGraphWindow(graph.graph())
+    val ui = controlFlowGraphWindow(controlFlowGraph, editorFromTree)
     val content = ContentFactory.getInstance().createContent(ui, name, false)
     contentManager.addContent(content)
     contentManager.setSelectedContent(content, true)
     activate(null)
 }
 
-fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindowPanel {
+fun controlFlowGraphWindow(controlFlowGraph: ControlFlowGraph, editor: TextEditor?): SimpleToolWindowPanel {
     var vertical = true
     var dfaComments = false
     var loaded = false
+
+    // Build the mapping from node ID to FIR element for click navigation
+    val graphGenerator = controlFlowGraph.graph()
+    // We need to extract the node-to-FIR mapping. The graph() function returns a lambda,
+    // but we need the mapping it builds internally. We'll build it here as well.
+    val nodeToFir = buildNodeToFirMap(controlFlowGraph)
 
     val browser = JBCefBrowser()
     browser.component.background = JBColor.WHITE
@@ -55,7 +70,7 @@ fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindow
 
     fun loadGraph() {
         val prefix = if (vertical) "TD" else "LR"
-        val definition = graph(prefix, dfaComments)
+        val definition = graphGenerator(prefix, dfaComments)
         if (!loaded) {
             loaded = true
             browser.loadHTML(mermaidHtml(definition))
@@ -104,7 +119,26 @@ fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindow
 
     val zoomQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
     zoomQuery.addHandler { percentage ->
-        zoomLabel.text = percentage + "%"
+        zoomLabel.text = "$percentage%"
+        null
+    }
+
+    // Set up click handler for navigating to source code
+    val clickQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
+    clickQuery.addHandler { nodeIdStr ->
+        ReadAction.nonBlocking(Callable handler@{
+            val nodeId = nodeIdStr.toString().toIntOrNull() ?: return@handler null
+            val firElement = nodeToFir[nodeId] ?: return@handler null
+            firElement.source
+        }).finishOnUiThread(ModalityState.nonModal()) { source ->
+            if (source == null) return@finishOnUiThread
+            val textEditor = editor ?: return@finishOnUiThread
+            val ideEditor = textEditor.editor
+            if (ideEditor.isDisposed) return@finishOnUiThread
+            ideEditor.caretModel.moveToOffset(source.startOffset)
+            ideEditor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
+            ideEditor.selectionModel.setSelection(source.startOffset, source.endOffset)
+        }.submit(AppExecutorUtil.getAppExecutorService())
         null
     }
 
@@ -116,6 +150,20 @@ fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindow
     ui.toolbar = toolbar
     ui.setContent(browser.component)
 
+    // Register callbacks BEFORE loading the graph so they are available when attachClickHandlers() runs
+    browser.cefBrowser.executeJavaScript(
+        "window.__cfgOnZoomChange = function(pct) { " +
+        zoomQuery.inject("pct") +
+        " };", "about:blank", 0
+    )
+
+    // Register the click handler before loadGraph() so it exists when Mermaid renders
+    browser.cefBrowser.executeJavaScript(
+        "window.__cfgOnNodeClick = function(nodeId) { " +
+        clickQuery.inject("nodeId") +
+        " };", "about:blank", 0
+    )
+
     loadGraph()
 
     toolbar.add(switch)
@@ -125,15 +173,51 @@ fun controlFlowGraphWindow(graph: (String, Boolean) -> String): SimpleToolWindow
     toolbar.add(zoomLabel)
     toolbar.add(zoomIn)
 
-    browser.cefBrowser.executeJavaScript(
-        "window.__cfgOnZoomChange = function(pct) { " +
-        zoomQuery.inject("pct") +
-        " };", "about:blank", 0
-    )
-
     browser.component.requestFocusInWindow()
 
     return ui
+}
+
+// Build a mapping from node ID to FIR element, mirroring the exact logic in ControlFlowGraph.graph()
+private fun buildNodeToFirMap(cfg: ControlFlowGraph): Map<Int, FirElement> {
+    val map = mutableMapOf<Int, FirElement>()
+    var nodeId = 0
+    val cfgToNodes = mutableMapOf<CFGNode<*>, Int>()
+
+    // Pre-fill all known nodes, exactly like graph() does
+    cfg.nodes.forEach { node ->
+        cfgToNodes.getOrPut(node) {
+            nodeId += 1
+            nodeId
+        }
+    }
+
+    fun processNode(node: CFGNode<*>) {
+        val thisNode = cfgToNodes.getOrPut(node) {
+            nodeId += 1
+            nodeId
+        }
+        // For enter/exit markers, map to the fir element they represent
+        val fir = node.fir.withoutSmartcast
+        map[thisNode] = fir
+
+        // Process subgraphs recursively, matching the order in graph()
+        if (node is CFGNodeWithSubgraphs<*>) {
+            for (subgraph in node.subGraphs) {
+                subgraph.nodes.forEach(::processNode)
+            }
+        }
+
+        // Process previous nodes (these may create new nodes not in the initial list)
+        node.previousNodes.forEach { previous ->
+            if (previous !in cfgToNodes) {
+                processNode(previous)
+            }
+        }
+    }
+
+    cfg.nodes.forEach(::processNode)
+    return map
 }
 
 private fun String.asJsStringLiteral(): String =

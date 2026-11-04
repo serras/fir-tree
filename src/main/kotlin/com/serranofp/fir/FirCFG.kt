@@ -43,11 +43,19 @@ $content
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12/dist/mermaid.esm.min.mjs';
   mermaid.initialize({
     startOnLoad: true,
+    securityLevel: 'loose',
     flowchart: { curve: "linear", useMaxWidth: false },
     theme: "${if (JBColor.isBright()) "redux-color" else "redux-dark-color"}",
     look: "neo",
     fontFamily: "JetBrains Mono, Trebuchet MS, Verdana, Arial"
   });
+
+  // Callback function for Mermaid click events
+  window.cfgNodeClicked = function(nodeId) {
+    if (typeof window.__cfgOnNodeClick === 'function') {
+      window.__cfgOnNodeClick(nodeId);
+    }
+  };
 
   let zoom = 1;
   const MIN = 0.2, MAX = 3.0, STEP = 1.2, WHEEL_STEP = 1.1;
@@ -95,11 +103,23 @@ $content
       .then(({ svg }) => {
         root.innerHTML = svg;
         window.__cfgFit();
+        attachClickHandlers();
       })
       .catch((err) => {
         root.innerHTML = '<pre>' + String(err) + '</pre>';
       });
   };
+
+  // Mermaid handles click events natively through the click syntax in the graph definition.
+  // We just need to fit the view after the initial render.
+  const observer = new MutationObserver(() => {
+    const svg = root.querySelector('svg');
+    if (svg) {
+      observer.disconnect();
+      window.__cfgFit();
+    }
+  });
+  observer.observe(root, { childList: true });
 </script>
 </body>
 </html>
@@ -232,6 +252,9 @@ fun ControlFlowGraph.graph(): ((String, Boolean) -> String) {
                 else if node.isUnion -> appendLine("  node$thisNode{{\"`$niceLabel`\"}}")
                 else -> appendLine("  node$thisNode[\"`$niceLabel`\"]")
             }
+
+            // Add click event for each node using Mermaid's native click syntax
+            appendLine("  click node$thisNode call cfgNodeClicked($thisNode)")
 
             if (node.previousNodes.isEmpty() || node.followingNodes.isEmpty()) {
                 appendLine("  style node$thisNode stroke-width:2px")

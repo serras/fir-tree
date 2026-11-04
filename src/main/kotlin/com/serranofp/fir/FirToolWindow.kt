@@ -74,7 +74,7 @@ class FirToolWindow : ToolWindowFactory {
             val lastComponent = tree.lastSelectedPathComponent
             val selected = (lastComponent as? FirTreeElement)?.value ?: (lastComponent as? FirElement) ?: return
             val window = ToolWindowManager.getInstance(project).getToolWindow("CFG")
-            window?.addTabForCFG(selected)
+            window?.addTabForCFG(selected, status?.second)
         }
 
         fun refreshWindowContents() {
